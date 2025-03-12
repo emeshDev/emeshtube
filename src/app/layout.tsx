@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const INTER = Inter({ subsets: ["latin"] });
 
@@ -15,8 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={INTER.className}>{children}</body>
-    </html>
+    <ClerkProvider afterSignOutUrl={"/"}>
+      <html lang="en">
+        <body className={INTER.className}>{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }

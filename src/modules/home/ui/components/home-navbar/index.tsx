@@ -15,7 +15,7 @@ const HomeNavbar = () => {
           <Link href={"/"}>
             <div className="p-4 flex items-center gap-1">
               <Image src={"/logo.svg"} width={32} height={532} alt="logo" />
-              <p className="text-xl font-semibold tracking-tight">New Tube</p>
+              <p className="text-xl font-semibold tracking-tight">EmeshTube</p>
             </div>
           </Link>
         </div>
