@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
   if (!SIGNING_SECRET) {
     throw new Error(
-      "Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env"
+      "Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env.local"
     );
   }
 
@@ -50,50 +50,118 @@ export async function POST(req: Request) {
     });
   }
 
-  // Do something with payload
-  // For this guide, log payload to console
+  // Get event type
   const eventType = evt.type;
+  console.log(`Processing webhook event: ${eventType}`);
 
+  // Handle user.created event
   if (eventType === "user.created") {
-    const { data } = evt;
+    try {
+      const { data } = evt;
 
-    const first_name = !data.first_name
-      ? data.email_addresses[0].email_address
-      : data.first_name;
-    const last_name = !data.last_name ? "" : data.last_name;
+      // Validate required data
+      if (!data.id) {
+        console.error("Missing user ID in user.created event");
+        return new Response("Missing User ID", { status: 400 });
+      }
 
-    await db.insert(users).values({
-      clerkId: data.id,
-      name: `${first_name} ${last_name}`,
-      imageUrl: data.image_url,
-    });
-  }
+      // Extract and validate email
+      let email = "";
+      if (data.email_addresses && data.email_addresses.length > 0) {
+        email = data.email_addresses[0].email_address;
+      }
 
-  if (eventType === "user.deleted") {
-    const { data } = evt;
+      // Determine user name
+      const first_name = data.first_name || email.split("@")[0] || "User";
+      const last_name = data.last_name || "";
 
-    if (!data.id) {
-      return new Response("Missing User ID", { status: 400 });
-    }
+      // Use default image URL if none provided
+      const imageUrl =
+        data.image_url ||
+        "https://ui-avatars.com/api/?name=" +
+          encodeURIComponent(`${first_name} ${last_name}`);
 
-    await db.delete(users).where(eq(users.clerkId, data.id));
-  }
+      console.log(
+        `Creating user: ${data.id}, Name: ${first_name} ${last_name}`
+      );
 
-  if (eventType === "user.updated") {
-    const { data } = evt;
-
-    const first_name = !data.first_name
-      ? data.email_addresses[0].email_address
-      : data.first_name;
-    const last_name = !data.last_name ? "" : data.last_name;
-
-    await db
-      .update(users)
-      .set({
+      const result = await db.insert(users).values({
+        clerkId: data.id,
         name: `${first_name} ${last_name}`,
-        imageUrl: data.image_url,
-      })
-      .where(eq(users.clerkId, data.id));
+        imageUrl: imageUrl,
+      });
+
+      console.log("User created successfully:", result);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      return new Response("Error creating user", { status: 500 });
+    }
+  }
+
+  // Handle user.deleted event
+  if (eventType === "user.deleted") {
+    try {
+      const { data } = evt;
+
+      if (!data.id) {
+        console.error("Missing user ID in user.deleted event");
+        return new Response("Missing User ID", { status: 400 });
+      }
+
+      console.log(`Deleting user with ID: ${data.id}`);
+
+      const result = await db.delete(users).where(eq(users.clerkId, data.id));
+      console.log("User deleted successfully:", result);
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return new Response("Error deleting user", { status: 500 });
+    }
+  }
+
+  // Handle user.updated event
+  if (eventType === "user.updated") {
+    try {
+      const { data } = evt;
+
+      // Validate required data
+      if (!data.id) {
+        console.error("Missing user ID in user.updated event");
+        return new Response("Missing User ID", { status: 400 });
+      }
+
+      // Extract and validate email
+      let email = "";
+      if (data.email_addresses && data.email_addresses.length > 0) {
+        email = data.email_addresses[0].email_address;
+      }
+
+      // Determine user name
+      const first_name = data.first_name || email.split("@")[0] || "User";
+      const last_name = data.last_name || "";
+
+      // Use default image URL if none provided
+      const imageUrl =
+        data.image_url ||
+        "https://ui-avatars.com/api/?name=" +
+          encodeURIComponent(`${first_name} ${last_name}`);
+
+      console.log(
+        `Updating user: ${data.id}, Name: ${first_name} ${last_name}`
+      );
+
+      const result = await db
+        .update(users)
+        .set({
+          name: `${first_name} ${last_name}`,
+          imageUrl: imageUrl,
+        })
+        .where(eq(users.clerkId, data.id));
+
+      console.log("User updated successfully:", result);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      return new Response("Error updating user", { status: 500 });
+    }
   }
 
   return new Response("Webhook received", { status: 200 });
