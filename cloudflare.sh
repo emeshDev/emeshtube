@@ -1,0 +1,1 @@
+cloudflared tunnel --config path/to/config.yml run
