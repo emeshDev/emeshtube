@@ -81,6 +81,8 @@ export async function POST(req: Request) {
         "https://ui-avatars.com/api/?name=" +
           encodeURIComponent(`${first_name} ${last_name}`);
 
+      const now = new Date(); // Current timestamp
+
       console.log(
         `Creating user: ${data.id}, Name: ${first_name} ${last_name}`
       );
@@ -89,6 +91,8 @@ export async function POST(req: Request) {
         clerkId: data.id,
         name: `${first_name} ${last_name}`,
         imageUrl: imageUrl,
+        createdAt: now,
+        updatedAt: now,
       });
 
       console.log("User created successfully:", result);
@@ -145,6 +149,8 @@ export async function POST(req: Request) {
         "https://ui-avatars.com/api/?name=" +
           encodeURIComponent(`${first_name} ${last_name}`);
 
+      const now = new Date(); // Current timestamp
+
       console.log(
         `Updating user: ${data.id}, Name: ${first_name} ${last_name}`
       );
@@ -154,6 +160,7 @@ export async function POST(req: Request) {
         .set({
           name: `${first_name} ${last_name}`,
           imageUrl: imageUrl,
+          updatedAt: now, // Only update the updatedAt timestamp
         })
         .where(eq(users.clerkId, data.id));
 
