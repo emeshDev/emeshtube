@@ -1,10 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { z } from "zod";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
+import { createTRPCRouter } from "../init";
 import { categoriesRouter } from "@/modules/categories/server/procedure";
+import { studioRouter } from "@/modules/studio/server/procedures";
+import { videosRouter } from "@/modules/videos/server/procedures";
 
 export const appRouter = createTRPCRouter({
   categories: categoriesRouter,
+  studio: studioRouter,
+  videos: videosRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

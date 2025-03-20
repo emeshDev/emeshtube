@@ -2,8 +2,7 @@
 
 import { FilterCarousel } from "@/components/FilterCarousel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTRPC } from "@/trpc/client";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { trpc } from "@/trpc/client";
 import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -51,10 +50,9 @@ const FilterCarouselSkeleton = () => (
 
 const CategoriesSectionSuspense = ({ categoryId }: CategoriesSectionProps) => {
   const router = useRouter();
-  const trpc = useTRPC();
-  const { data: categories } = useSuspenseQuery(
-    trpc.categories.getMany.queryOptions()
-  );
+
+  const [categories] = trpc.categories.getMany.useSuspenseQuery();
+
   const categoriesData = categories.map(({ name, id }) => ({
     value: id,
     label: name,

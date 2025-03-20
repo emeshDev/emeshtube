@@ -15,6 +15,13 @@
       "when": 1742285863096,
       "tag": "0001_watery_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1742371530970,
+      "tag": "0002_talented_thunderbolt",
+      "breakpoints": true
     }
   ]
 }
