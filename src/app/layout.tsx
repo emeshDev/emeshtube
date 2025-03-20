@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TRPCProvider } from "@/trpc/client";
+import { Toaster } from "@/components/ui/sonner";
 
 const INTER = Inter({ subsets: ["latin"] });
 
@@ -20,7 +21,9 @@ export default function RootLayout({
     <ClerkProvider afterSignOutUrl={"/"}>
       <html lang="en">
         <body className={INTER.className}>
-          <TRPCProvider> {children}</TRPCProvider>
+          <TRPCProvider>
+            <Toaster /> {children}
+          </TRPCProvider>
         </body>
       </html>
     </ClerkProvider>
