@@ -10,9 +10,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DEFAULT_LIMIT } from "@/constants";
+import { VideoThumbnail } from "@/modules/videos/ui/components/video-thumbnail";
 import { trpc } from "@/trpc/client";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 type Props = {
@@ -30,6 +31,7 @@ export const VideosSection = ({ categoryId }: Props) => {
 };
 
 const VideosSectionSuspense = ({ categoryId }: Props) => {
+  const utils = trpc.useUtils();
   const [videos, query] = trpc.studio.infiniteVideos.useSuspenseInfiniteQuery(
     {
       limit: DEFAULT_LIMIT,
@@ -39,6 +41,29 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }
   );
+
+  // Fungsi untuk memformat tanggal secara client-side
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString();
+  };
+
+  useEffect(() => {
+    // Check if any video is in processing state
+    const hasProcessingVideos = videos.pages.some((page) =>
+      page.items.some(
+        (video) => video.muxStatus === "preparing" || !video.thumbnailUrl // Also check if thumbnail is not available yet
+      )
+    );
+
+    // If there are processing videos, set up polling
+    if (hasProcessingVideos) {
+      const interval = setInterval(() => {
+        utils.studio.infiniteVideos.invalidate();
+      }, 3000); // Poll every 3 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [videos, utils.studio.infiniteVideos]);
 
   return (
     <div>
@@ -65,12 +90,31 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
                   legacyBehavior
                 >
                   <TableRow className="cursor-pointer">
-                    <TableCell>{video.title}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-4">
+                        <div className="relative aspect-video w-36 shrink-0">
+                          <VideoThumbnail thumbnailUrl={video.thumbnailUrl} />
+                        </div>
+                        <div>
+                          <p className="font-medium line-clamp-2">
+                            {video.title}
+                          </p>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {video.description || "No description"}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>Visibility</TableCell>
-                    <TableCell>status</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Comments</TableCell>
-                    <TableCell>Likes</TableCell>
+                    <TableCell>{video.muxStatus || "Processing"}</TableCell>
+                    <TableCell>
+                      {video.createdAt instanceof Date
+                        ? formatDate(video.createdAt)
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell className="text-right">0</TableCell>
+                    <TableCell className="text-right">0</TableCell>
+                    <TableCell className="text-right pr-6">0</TableCell>
                   </TableRow>
                 </Link>
               ))}

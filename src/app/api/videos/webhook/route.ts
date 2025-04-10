@@ -180,6 +180,8 @@ export const POST = async (request: Request) => {
           return new Response("Playback ID mismatch detected", { status: 409 });
         }
 
+        const thumbnailUrl = `https://image.mux.com/${data.playback_ids?.[0].id}/thumbnail.jpg`;
+
         // Define the update object with all fields
         const updateData: {
           muxStatus: string;
@@ -187,6 +189,7 @@ export const POST = async (request: Request) => {
           muxTrackId?: string;
           muxTrackStatus?: string;
           updatedAt: Date;
+          thumbnailUrl?: string;
         } = {
           muxStatus: data.status,
           updatedAt: new Date(),
@@ -210,6 +213,13 @@ export const POST = async (request: Request) => {
           }
         }
 
+        if (!thumbnailUrl) {
+          updateData.thumbnailUrl =
+            "https://emeshtube.emeshdev.com/placeholder.svg";
+        }
+
+        updateData.thumbnailUrl = thumbnailUrl;
+
         // Update the video by asset ID
         const result = await db
           .update(videos)
@@ -221,6 +231,7 @@ export const POST = async (request: Request) => {
             updatedMuxPlaybackId: videos.muxPlaybackId,
             updatedMuxTrackId: videos.muxTrackId,
             updatedMuxTrackStatus: videos.muxTrackStatus,
+            updatedThumbnailUrl: videos.thumbnailUrl,
           });
 
         // console.log("Update result:", JSON.stringify(result, null, 2));
@@ -273,6 +284,7 @@ export const POST = async (request: Request) => {
                 updatedMuxPlaybackId: videos.muxPlaybackId,
                 updatedMuxTrackId: videos.muxTrackId,
                 updatedMuxTrackStatus: videos.muxTrackStatus,
+                updatedThumbnailUrl: videos.thumbnailUrl,
               });
 
             console.log(
