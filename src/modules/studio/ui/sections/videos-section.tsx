@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DEFAULT_LIMIT } from "@/constants";
+import { toTitleCase, truncateText } from "@/lib/utils";
 import { VideoThumbnail } from "@/modules/videos/ui/components/video-thumbnail";
 import { trpc } from "@/trpc/client";
 import Link from "next/link";
@@ -44,7 +45,13 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
 
   // Fungsi untuk memformat tanggal secara client-side
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   useEffect(() => {
@@ -93,14 +100,23 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
                     <TableCell>
                       <div className="flex items-center gap-4">
                         <div className="relative aspect-video w-36 shrink-0">
-                          <VideoThumbnail thumbnailUrl={video.thumbnailUrl} />
+                          <VideoThumbnail
+                            thumbnailUrl={video.thumbnailUrl}
+                            previewUrl={video.previewUrl}
+                            title={video.title}
+                            duration={video.duration}
+                          />
                         </div>
                         <div>
-                          <p className="font-medium line-clamp-2">
-                            {video.title}
+                          <p className="font-medium line-clamp-1">
+                            {video.title
+                              ? toTitleCase(video.title)
+                              : "Untitled"}
                           </p>
                           <p className="text-sm text-muted-foreground line-clamp-2">
-                            {video.description || "No description"}
+                            {video.description
+                              ? truncateText(video.description, 25)
+                              : "No Description"}
                           </p>
                         </div>
                       </div>

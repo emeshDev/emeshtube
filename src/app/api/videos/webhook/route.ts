@@ -181,6 +181,13 @@ export const POST = async (request: Request) => {
         }
 
         const thumbnailUrl = `https://image.mux.com/${data.playback_ids?.[0].id}/thumbnail.jpg`;
+        const previewUrl = `https://image.mux.com/${data.playback_ids?.[0].id}/animated.gif`;
+
+        // Get video duration from tracks
+        let duration = null;
+        if (data.tracks && data.tracks.length > 0 && data.tracks[0]?.duration) {
+          duration = Math.round(data.tracks[0].duration);
+        }
 
         // Define the update object with all fields
         const updateData: {
@@ -190,6 +197,8 @@ export const POST = async (request: Request) => {
           muxTrackStatus?: string;
           updatedAt: Date;
           thumbnailUrl?: string;
+          previewUrl?: string;
+          duration?: number | null;
         } = {
           muxStatus: data.status,
           updatedAt: new Date(),
@@ -219,6 +228,8 @@ export const POST = async (request: Request) => {
         }
 
         updateData.thumbnailUrl = thumbnailUrl;
+        updateData.previewUrl = previewUrl;
+        updateData.duration = duration;
 
         // Update the video by asset ID
         const result = await db
@@ -232,6 +243,8 @@ export const POST = async (request: Request) => {
             updatedMuxTrackId: videos.muxTrackId,
             updatedMuxTrackStatus: videos.muxTrackStatus,
             updatedThumbnailUrl: videos.thumbnailUrl,
+            updatedPreviewUrl: videos.previewUrl,
+            updatedDuration: videos.duration,
           });
 
         // console.log("Update result:", JSON.stringify(result, null, 2));
@@ -285,6 +298,8 @@ export const POST = async (request: Request) => {
                 updatedMuxTrackId: videos.muxTrackId,
                 updatedMuxTrackStatus: videos.muxTrackStatus,
                 updatedThumbnailUrl: videos.thumbnailUrl,
+                updatedPreviewUrl: videos.previewUrl,
+                updatedDuration: videos.duration,
               });
 
             console.log(
