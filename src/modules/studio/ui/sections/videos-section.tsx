@@ -10,9 +10,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DEFAULT_LIMIT } from "@/constants";
-import { toTitleCase, truncateText } from "@/lib/utils";
+import { toSnakeCase, toTitleCase, truncateText } from "@/lib/utils";
 import { VideoThumbnail } from "@/modules/videos/ui/components/video-thumbnail";
 import { trpc } from "@/trpc/client";
+import { Globe2Icon, LockIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -121,7 +122,16 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>Visibility</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        {video.visibility === "private" ? (
+                          <LockIcon className="size-4 mr-2" />
+                        ) : (
+                          <Globe2Icon className="size-4 mr-2" />
+                        )}
+                        {toSnakeCase(video.visibility)}
+                      </div>
+                    </TableCell>
                     <TableCell>{video.muxStatus || "Processing"}</TableCell>
                     <TableCell className="text-sm truncate">
                       {video.createdAt instanceof Date

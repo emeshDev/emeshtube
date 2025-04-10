@@ -323,6 +323,7 @@ export const POST = async (request: Request) => {
 
         break;
       }
+
       case "video.asset.errored": {
         const data = payload.data as VideoAssetErroredWebhookEvent["data"];
         if (!data.upload_id) {
@@ -337,6 +338,7 @@ export const POST = async (request: Request) => {
 
         break;
       }
+
       case "video.asset.deleted": {
         const data = payload.data as VideoAssetDeletedWebhookEvent["data"];
 
@@ -346,6 +348,33 @@ export const POST = async (request: Request) => {
         }
 
         await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
+
+        break;
+      }
+
+      case "video.asset.track.ready": {
+        const data =
+          payload.data as VideoAssetTrackReadyWebhookEvent["data"] & {
+            asset_id: string;
+          };
+
+        console.log("Track Ready");
+
+        const assetId = data.asset_id;
+        const trackId = data.id;
+        const status = data.status;
+
+        if (!assetId) {
+          return new Response("Missing asset ID", { status: 400 });
+        }
+
+        await db
+          .update(videos)
+          .set({
+            muxTrackId: trackId,
+            muxTrackStatus: status,
+          })
+          .where(eq(videos.muxAssetId, assetId));
 
         break;
       }
