@@ -123,7 +123,7 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
                     </TableCell>
                     <TableCell>Visibility</TableCell>
                     <TableCell>{video.muxStatus || "Processing"}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-sm truncate">
                       {video.createdAt instanceof Date
                         ? formatDate(video.createdAt)
                         : "N/A"}

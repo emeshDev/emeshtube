@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { videos } from "@/db/schema";
+import { mux } from "@/lib/mux";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -81,5 +82,75 @@ export const studioRouter = createTRPCRouter({
         items: newItems,
         nextCursor,
       };
+    }),
+
+  deleteVideo: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { id } = input;
+      const { user } = ctx;
+
+      // Cek apakah video ada dan milik user ini
+      const videoToDelete = await db
+        .select({
+          id: videos.id,
+          muxAssetId: videos.muxAssetId,
+          muxUploadId: videos.muxUploadId,
+        })
+        .from(videos)
+        .where(and(eq(videos.id, id), eq(videos.userId, user.id)))
+        .limit(1);
+
+      if (!videoToDelete.length) {
+        throw new Error(
+          "Video not found or you don't have permission to delete it"
+        );
+      }
+
+      const video = videoToDelete[0];
+
+      try {
+        // Jika ada Mux Asset ID, hapus dari Mux
+        if (video.muxAssetId) {
+          try {
+            await mux.video.assets.delete(video.muxAssetId);
+          } catch (error) {
+            console.error("Error deleting Mux asset:", error);
+            // Lanjutkan meskipun error di Mux (video masih perlu dihapus dari DB)
+          }
+        }
+
+        // Jika ada Mux Upload ID, hapus dari Mux Uploads
+        if (video.muxUploadId) {
+          try {
+            await mux.video.uploads.cancel(video.muxUploadId);
+          } catch (error) {
+            console.error("Error cancelling Mux upload:", error);
+            // Lanjutkan meskipun error di Mux (video masih perlu dihapus dari DB)
+          }
+        }
+
+        // Hapus video dari database
+        const result = await db
+          .delete(videos)
+          .where(eq(videos.id, id))
+          .returning({ id: videos.id });
+
+        if (!result.length) {
+          throw new Error("Failed to delete video");
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error deleting video:", error);
+        throw new Error(
+          "Failed to delete video: " +
+            (error instanceof Error ? error.message : "Unknown error")
+        );
+      }
     }),
 });

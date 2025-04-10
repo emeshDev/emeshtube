@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import {
   VideoAssetCreatedWebhookEvent,
+  VideoAssetDeletedWebhookEvent,
   VideoAssetErroredWebhookEvent,
   VideoAssetReadyWebhookEvent,
   VideoAssetTrackReadyWebhookEvent,
@@ -20,7 +21,8 @@ type WebhookEvent =
   | VideoAssetCreatedWebhookEvent
   | VideoAssetReadyWebhookEvent
   | VideoAssetErroredWebhookEvent
-  | VideoAssetTrackReadyWebhookEvent;
+  | VideoAssetTrackReadyWebhookEvent
+  | VideoAssetDeletedWebhookEvent;
 
 export const POST = async (request: Request) => {
   if (!SIGNING_SECRET) {
@@ -184,7 +186,7 @@ export const POST = async (request: Request) => {
         const previewUrl = `https://image.mux.com/${data.playback_ids?.[0].id}/animated.gif`;
 
         // Get video duration from tracks
-        let duration = null;
+        let duration = 0;
         if (data.tracks && data.tracks.length > 0 && data.tracks[0]?.duration) {
           duration = Math.round(data.tracks[0].duration);
         }
@@ -198,7 +200,7 @@ export const POST = async (request: Request) => {
           updatedAt: Date;
           thumbnailUrl?: string;
           previewUrl?: string;
-          duration?: number | null;
+          duration?: number;
         } = {
           muxStatus: data.status,
           updatedAt: new Date(),
@@ -318,6 +320,32 @@ export const POST = async (request: Request) => {
             });
           }
         }
+
+        break;
+      }
+      case "video.asset.errored": {
+        const data = payload.data as VideoAssetErroredWebhookEvent["data"];
+        if (!data.upload_id) {
+          console.error("No upload ID found in webhook payload", data);
+          return new Response("No upload ID found", { status: 400 });
+        }
+
+        await db
+          .update(videos)
+          .set({ muxStatus: data.status })
+          .where(eq(videos.muxUploadId, data.upload_id));
+
+        break;
+      }
+      case "video.asset.deleted": {
+        const data = payload.data as VideoAssetDeletedWebhookEvent["data"];
+
+        if (!data.upload_id) {
+          console.error("No upload ID found in webhook payload", data);
+          return new Response("No upload ID found", { status: 400 });
+        }
+
+        await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
 
         break;
       }

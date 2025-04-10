@@ -50,6 +50,20 @@
       "when": 1744260039068,
       "tag": "0006_flowery_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1744265426512,
+      "tag": "0007_careless_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1744265798231,
+      "tag": "0008_lyrical_the_phantom",
+      "breakpoints": true
     }
   ]
 }
