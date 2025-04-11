@@ -1,7 +1,7 @@
 import { HomeView } from "@/modules/home/ui/views/home-view";
 import { HydrateClient, trpc } from "@/trpc/server";
 
-export const DYNAMIC = "force-dynamic";
+// export const DYNAMIC = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{

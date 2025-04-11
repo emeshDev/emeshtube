@@ -1,6 +1,7 @@
 "use client";
 
 import { InfiniteScroll } from "@/components/infinite-scroll";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -24,7 +25,7 @@ type Props = {
 
 export const VideosSection = ({ categoryId }: Props) => {
   return (
-    <Suspense fallback={<p>Loading...</p>}>
+    <Suspense fallback={<VideosSectionSkeleton />}>
       <ErrorBoundary fallback={<p>Error...</p>}>
         <VideosSectionSuspense categoryId={categoryId} />
       </ErrorBoundary>
@@ -32,8 +33,46 @@ export const VideosSection = ({ categoryId }: Props) => {
   );
 };
 
+const VideosSectionSkeleton = () => {
+  return (
+    <>
+      <div className="border-y">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-6 w-[510px]">Video</TableHead>
+              <TableHead>Visibility</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Views</TableHead>
+              <TableHead className="text-right">Comments</TableHead>
+              <TableHead className="text-right pr-6">Likes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <TableRow key={index}>
+                <TableCell className="pl-6">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-20 w-36" />
+                    <div className="flex flex-col gap-2">
+                      <Skeleton className="h-4 w-[100px]" />
+                      <Skeleton className="h-3 w-[150px]" />
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+};
+
 const VideosSectionSuspense = ({ categoryId }: Props) => {
   const utils = trpc.useUtils();
+
   const [videos, query] = trpc.studio.infiniteVideos.useSuspenseInfiniteQuery(
     {
       limit: DEFAULT_LIMIT,
@@ -58,9 +97,7 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
   useEffect(() => {
     // Check if any video is in processing state
     const hasProcessingVideos = videos.pages.some((page) =>
-      page.items.some(
-        (video) => video.muxStatus === "preparing" || !video.thumbnailUrl // Also check if thumbnail is not available yet
-      )
+      page.items.some((video) => video.muxStatus === "waiting")
     );
 
     // If there are processing videos, set up polling
@@ -72,6 +109,15 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
       return () => clearInterval(interval);
     }
   }, [videos, utils.studio.infiniteVideos]);
+
+  // pembersih localstorage untuk video yang terhapus
+  useEffect(() => {
+    const deleted = localStorage.getItem("videoDeleted");
+    if (deleted === "true") {
+      localStorage.removeItem("videoDeleted");
+      window.location.reload();
+    }
+  }, []);
 
   return (
     <div>
@@ -98,7 +144,7 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
                   legacyBehavior
                 >
                   <TableRow className="cursor-pointer">
-                    <TableCell>
+                    <TableCell className="pl-6">
                       <div className="flex items-center gap-4">
                         <div className="relative aspect-video w-36 shrink-0">
                           <VideoThumbnail
