@@ -66,6 +66,7 @@ export const StudioUploadButton = () => {
           <StudioUploader
             endpoint={create.data.url}
             onSuccess={handleUploadSuccess}
+            videoId={create.data.video.id}
           />
         ) : (
           <Loader2Icon className="animate-spin" />

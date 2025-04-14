@@ -1,18 +1,11 @@
 import { db } from "@/db";
 import { videos } from "@/db/schema";
 import { mux } from "@/lib/mux";
+import { updateThumbnailSchema, updateVideoSchema } from "@/lib/schema/video";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-
-const UpdateVideoSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().min(1, "Title is required"),
-  description: z.string().nullable().optional(),
-  categoryId: z.string().uuid().nullable().optional(),
-  visibility: z.enum(["private", "public"]),
-});
 
 export const videosRouter = createTRPCRouter({
   create: protectedProcedure.mutation(async ({ ctx }) => {
@@ -129,7 +122,7 @@ export const videosRouter = createTRPCRouter({
     }),
 
   update: protectedProcedure
-    .input(UpdateVideoSchema)
+    .input(updateVideoSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, ...updateData } = input;
       const { user } = ctx;
@@ -175,6 +168,57 @@ export const videosRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to delete video",
+        });
+      }
+    }),
+
+  updateThumbnail: protectedProcedure
+    .input(updateThumbnailSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { id, thumbnailUrl } = input;
+      const { user } = ctx;
+
+      try {
+        const videoExists = await db
+          .select({ id: videos.id })
+          .from(videos)
+          .where(and(eq(videos.id, id), eq(videos.userId, user.id)))
+          .limit(1);
+
+        if (!videoExists.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Video not found or you dont have permission to update it",
+          });
+        }
+
+        const [updatedVideo] = await db
+          .update(videos)
+          .set({
+            thumbnailUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(videos.id, id))
+          .returning();
+
+        if (!updatedVideo) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to update thumbnail",
+          });
+        }
+
+        return updatedVideo;
+      } catch (error) {
+        console.error("Error updating thumbnail:", error);
+
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update thumbnail",
         });
       }
     }),

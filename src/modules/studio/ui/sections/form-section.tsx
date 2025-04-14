@@ -12,6 +12,7 @@ import { trpc } from "@/trpc/client";
 import {
   CheckIcon,
   CopyIcon,
+  ImageIcon,
   Loader2Icon,
   MoreVerticalIcon,
   TrashIcon,
@@ -55,19 +56,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { updateVideoSchema } from "@/lib/schema/video";
+import Image from "next/image";
+import { ThumbnailUploader } from "../components/ThumbnailUploader";
 
 interface PageProps {
   videoId: string;
 }
 
-const FormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-  categoryId: z.string().uuid().optional().nullable(),
-  visibility: z.enum(["private", "public"]),
-});
-
-type FormValues = z.infer<typeof FormSchema>;
+type FormValues = z.infer<typeof updateVideoSchema>;
 
 export const FormView = ({ videoId }: PageProps) => {
   return (
@@ -94,10 +91,16 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
   const [categories] = trpc.categories.getMany.useSuspenseQuery();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(
+    video.thumbnailUrl
+  );
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(FormSchema),
+    resolver: zodResolver(updateVideoSchema),
     defaultValues: {
+      id: videoId,
       title: video.title,
       description: video.description || "",
       categoryId: video.categoryId || null,
@@ -117,15 +120,30 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     },
   });
 
+  const updateThumbnail = trpc.videos.updateThumbnail.useMutation({
+    onSuccess: () => {
+      setIsUpdating(false);
+      toast.success("Thumbnail updated successfully");
+      utils.studio.getOne.invalidate({ id: videoId });
+      utils.studio.infiniteVideos.invalidate();
+    },
+    onError: (error) => {
+      setIsUpdating(false);
+      toast.error(`Error updating thumbnail`);
+      console.error(error);
+    },
+  });
+
   const deleteVideo = trpc.videos.delete.useMutation({
     onSuccess: () => {
       toast.success("Video deleted successfully");
       utils.studio.infiniteVideos.invalidate();
       localStorage.setItem("videoDeleted", "true");
-      window.location.href = "/studio";
+      // window.location.href = "/studio";
       // router.push("/studio");
       // Force a completely new request to the server with a timestamp parameter
-      // window.location.replace("/studio?t=" + Date.now());
+      const timestamp = Date.now();
+      window.location.replace(`/studio?t=${timestamp}`);
     },
     onError: (err) => {
       toast.error("Error deleting video");
@@ -134,14 +152,37 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
   });
 
   const onSubmit = (val: FormValues) => {
-    updateVideo.mutate({
-      id: videoId,
-      ...val,
-    });
+    updateVideo.mutate({ ...val, id: videoId });
   };
 
   const confirmDelete = () => {
     deleteVideo.mutate({ id: videoId });
+  };
+
+  const handleThumbnailUpload = (url: string) => {
+    if (url === thumbnailUrl) return;
+
+    setThumbnailUrl(url);
+    setIsUpdating(true);
+
+    updateThumbnail.mutate({
+      id: videoId,
+      thumbnailUrl: url || null,
+    });
+  };
+
+  const handleResetThumbnail = () => {
+    setIsUpdating(true);
+
+    // Reset to auto-generated thumbnail from Mux
+    if (video.muxPlaybackId) {
+      const autoThumbnail = `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg`;
+      setThumbnailUrl(autoThumbnail);
+      updateThumbnail.mutate({
+        id: videoId,
+        thumbnailUrl: autoThumbnail,
+      });
+    }
   };
 
   const videoUrl = video.muxPlaybackId
@@ -160,6 +201,11 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     }
   };
 
+  const handleSaveButtonClick = () => {
+    // Manual trigger form submission
+    form.handleSubmit(onSubmit)();
+  };
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -173,7 +219,7 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
           <Button
             type="button"
             disabled={updateVideo.isPending || !form.formState.isDirty}
-            onClick={form.handleSubmit(onSubmit)}
+            onClick={handleSaveButtonClick}
           >
             Save
             {updateVideo.isPending ? (
@@ -198,9 +244,10 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
         </div>
       </div>
 
-      <Tabs defaultValue="basic">
+      <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
+          <TabsTrigger value="thumbnail">Thumbnail</TabsTrigger>
           <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
         </TabsList>
 
@@ -305,10 +352,87 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="advanced">
+        <TabsContent value="thumbnail">
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium">Video Thumbnail</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Upload a custom thumbnail for your video or use the
+                    auto-generated one
+                  </p>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Current thumbnail display */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">
+                        Current Thumbnail
+                      </h4>
+                      <div className="aspect-video relative rounded-lg overflow-hidden border border-border">
+                        {isUpdating ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                            <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        ) : null}
+
+                        {thumbnailUrl ? (
+                          <Image
+                            src={thumbnailUrl}
+                            alt="Current thumbnail"
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              console.error(
+                                "Error loading image:",
+                                thumbnailUrl
+                              );
+                              e.currentTarget.src = "/placeholder.svg";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full bg-muted">
+                            <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Auto-generated thumbnail option */}
+                      {video.muxPlaybackId && (
+                        <div className="mt-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleResetThumbnail}
+                            disabled={isUpdating || updateThumbnail.isPending}
+                          >
+                            Reset to Auto-generated
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload custom thumbnail */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">
+                        Upload Custom Thumbnail
+                      </h4>
+                      <ThumbnailUploader
+                        videoId={videoId}
+                        onUploadComplete={handleThumbnailUpload}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="advanced">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-8">
                 <div>
                   <h3 className="text-lg font-medium mb-2">Video URL</h3>
                   <div className="flex flex-col gap-2">
@@ -321,9 +445,9 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                             className="font-mono text-sm"
                           />
                           <Button
-                            size={"sm"}
+                            size="sm"
                             onClick={handleCopyUrl}
-                            variant={"outline"}
+                            variant="outline"
                           >
                             {isCopied ? (
                               <CheckIcon className="size-4" />
@@ -333,13 +457,13 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                           </Button>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          share this URL with others to let them watch your
+                          Share this URL with others to let them watch your
                           video
                         </p>
                       </>
                     ) : (
-                      <p>
-                        Video URL will be available once processing is complet
+                      <p className="text-sm text-muted-foreground">
+                        Video URL will be available once processing is complete
                       </p>
                     )}
                   </div>
@@ -360,6 +484,14 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                     <div className="flex items-center gap-2 text-sm mt-2">
                       <span className="font-medium">Duration:</span>
                       <span>{formatDuration(video.duration)}</span>
+                    </div>
+                  ) : null}
+                  {video.muxPlaybackId ? (
+                    <div className="flex items-center gap-2 text-sm mt-2">
+                      <span className="font-medium">Playback ID:</span>
+                      <span className="font-mono text-xs">
+                        {video.muxPlaybackId}
+                      </span>
                     </div>
                   ) : null}
                 </div>

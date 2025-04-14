@@ -13,6 +13,7 @@ import { useState } from "react";
 interface StudioUploaderProps {
   endpoint?: string | null;
   onSuccess: () => void;
+  videoId?: string;
 }
 
 const UPLOADER_ID = "video-uploader";
@@ -20,6 +21,7 @@ const UPLOADER_ID = "video-uploader";
 export const StudioUploader = ({
   endpoint,
   onSuccess,
+  videoId,
 }: StudioUploaderProps) => {
   const [isUploaded, setIsUploaded] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
@@ -36,7 +38,11 @@ export const StudioUploader = ({
     setIsReloading(true);
     // Berikan waktu untuk toast success muncul sebelum reload
     setTimeout(() => {
-      window.location.reload();
+      if (videoId) {
+        window.location.href = `/studio/videos/${videoId}`;
+      } else {
+        window.location.reload();
+      }
     }, 1000);
   };
 
