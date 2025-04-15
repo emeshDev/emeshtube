@@ -11,7 +11,7 @@ interface PageProps {
 
 export const VideoView = ({ videoId }: PageProps) => {
   return (
-    <div className="px-4 pt-2.5 max-w-screen">
+    <div className="px-4 pt-2.5 min-h-screen">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <Suspense fallback={<VideoPlayerSkeleton />}>

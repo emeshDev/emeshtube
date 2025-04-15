@@ -10,12 +10,14 @@ import { toast } from "sonner";
 
 interface ThumbnailUploaderProps {
   videoId: string;
-  onUploadComplete: (url: string) => void;
+  onUploadComplete: (url: string, fileKey: string) => void;
+  isDeleting?: boolean;
 }
 
 export const ThumbnailUploader = ({
   videoId,
   onUploadComplete,
+  isDeleting = false,
 }: ThumbnailUploaderProps) => {
   const [isUploading, setIsUploading] = useState(false);
 
@@ -23,10 +25,12 @@ export const ThumbnailUploader = ({
     onClientUploadComplete: (res) => {
       setIsUploading(false);
       if (res && res.length > 0) {
-        // Use the URL returned by the server
+        // Extract the file data from response
         const fileUrl = res[0].url;
-        console.log("Thumbnail uploaded, URL:", fileUrl);
-        onUploadComplete(fileUrl);
+        // The key is the unique identifier we need for deletion
+        const fileKey = res[0].key;
+        console.log("Thumbnail uploaded, URL:", fileUrl, "Key:", fileKey);
+        onUploadComplete(fileUrl, fileKey);
         toast.success("Thumbnail uploaded successfully");
       }
     },
@@ -67,8 +71,8 @@ export const ThumbnailUploader = ({
       "image/webp",
     ]),
     maxFiles: 1,
-    maxSize: 2 * 1024 * 1024, // 4MB
-    disabled: isUploading,
+    maxSize: 2 * 1024 * 1024, // 2MB
+    disabled: isUploading || isDeleting,
   });
 
   return (
@@ -77,13 +81,13 @@ export const ThumbnailUploader = ({
         {...getRootProps()}
         className={`
           cursor-pointer 
-          border-2 border-dashed border-border 
+          border-2 border-dashed border-slate-200
           rounded-lg 
           aspect-video
           flex flex-col items-center justify-center
           transition-colors
-          ${isDragActive ? "bg-primary/5" : "bg-muted/50 hover:bg-muted"}
-          ${isUploading ? "pointer-events-none" : ""}
+          ${isDragActive ? "bg-primary/5" : "bg-slate-50 hover:bg-slate-100"}
+          ${isUploading || isDeleting ? "pointer-events-none opacity-70" : ""}
         `}
       >
         <input {...getInputProps()} />
@@ -92,6 +96,13 @@ export const ThumbnailUploader = ({
             <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               Uploading thumbnail...
+            </p>
+          </div>
+        ) : isDeleting ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2Icon className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Deleting thumbnail...
             </p>
           </div>
         ) : (
@@ -116,7 +127,7 @@ export const ThumbnailUploader = ({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Recommended: Use a 16:9 aspect ratio image (JPG, PNG, WebP) up to 4MB
+        Recommended: Use a 16:9 aspect ratio image (JPG, PNG, WebP) up to 2MB
       </p>
     </div>
   );

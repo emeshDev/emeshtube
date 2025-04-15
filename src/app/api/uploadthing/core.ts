@@ -1,5 +1,8 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { UploadThingError } from "uploadthing/server";
+
+// For error handling in middleware
+// Use the Error class directly since UploadThingError might not be exported
+// from the correct location in your current version
 
 const f = createUploadthing();
 
@@ -18,7 +21,8 @@ export const ourFileRouter = {
       const videoId = headers.get("x-video-id");
 
       if (!videoId) {
-        throw new UploadThingError("Video ID is required");
+        // Use standard Error instead of UploadThingError
+        throw new Error("Video ID is required");
       }
 
       // Gunakan fake userId untuk testing

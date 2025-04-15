@@ -17,7 +17,7 @@ import {
   MoreVerticalIcon,
   TrashIcon,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { useForm } from "react-hook-form";
@@ -97,6 +97,12 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
   );
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // for deleting thumbnail
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentFileKey, setCurrentFileKey] = useState<string | undefined>(
+    undefined
+  );
+
   const form = useForm<FormValues>({
     resolver: zodResolver(updateVideoSchema),
     defaultValues: {
@@ -134,6 +140,22 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     },
   });
 
+  const deleteThumbnail = trpc.videos.deleteThumbnail.useMutation({
+    onSuccess: () => {
+      setIsDeleting(false);
+      setThumbnailUrl(null);
+      setCurrentFileKey(undefined);
+      toast.success("Thumbnail deleted successfully");
+      utils.studio.getOne.invalidate({ id: videoId });
+      utils.studio.infiniteVideos.invalidate();
+    },
+    onError: (err) => {
+      setIsDeleting(false);
+      toast.error("Error deleting thumbnail");
+      console.error(err);
+    },
+  });
+
   const deleteVideo = trpc.videos.delete.useMutation({
     onSuccess: () => {
       toast.success("Video deleted successfully");
@@ -159,15 +181,26 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     deleteVideo.mutate({ id: videoId });
   };
 
-  const handleThumbnailUpload = (url: string) => {
+  const handleThumbnailUpload = (url: string, fileKey: string) => {
     if (url === thumbnailUrl) return;
 
     setThumbnailUrl(url);
+    setCurrentFileKey(fileKey);
     setIsUpdating(true);
 
     updateThumbnail.mutate({
       id: videoId,
       thumbnailUrl: url || null,
+    });
+  };
+
+  const handleDeleteThumbnail = () => {
+    if (!thumbnailUrl) return;
+    setIsDeleting(true);
+
+    deleteThumbnail.mutate({
+      id: videoId,
+      fileKey: currentFileKey,
     });
   };
 
@@ -201,13 +234,34 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     }
   };
 
+  // Ekstrak fileKey dari URL jika belum ada
+  const getFileKeyFromUrl = (url: string | null): string | undefined => {
+    if (!url || !url.includes("utfs.io")) return undefined;
+
+    try {
+      // URL format: https://utfs.io/f/[fileKey]
+      const urlParts = url.split("/");
+      return urlParts[urlParts.length - 1];
+    } catch (error) {
+      console.error("Error extracting file key from URL:", error);
+      return undefined;
+    }
+  };
+
+  // Jika tidak punya currentFileKey tapi punya thumbnailUrl, coba ekstrak
+  useEffect(() => {
+    if (!currentFileKey && thumbnailUrl && thumbnailUrl.includes("utfs.io")) {
+      setCurrentFileKey(getFileKeyFromUrl(thumbnailUrl));
+    }
+  }, [thumbnailUrl, currentFileKey]);
+
   const handleSaveButtonClick = () => {
     // Manual trigger form submission
     form.handleSubmit(onSubmit)();
   };
 
   return (
-    <>
+    <div className="container mx-auto px-4 py-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Video Details</h1>
@@ -244,16 +298,36 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
         </div>
       </div>
 
-      <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="basic">Basic Info</TabsTrigger>
-          <TabsTrigger value="thumbnail">Thumbnail</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced Settings</TabsTrigger>
-        </TabsList>
+      <div className="bg-white rounded-lg shadow-sm border">
+        <Tabs
+          defaultValue="basic"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="w-full border-b rounded-none px-6 justify-start h-14">
+            <TabsTrigger
+              value="basic"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            >
+              Basic Info
+            </TabsTrigger>
+            <TabsTrigger
+              value="thumbnail"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            >
+              Thumbnail
+            </TabsTrigger>
+            <TabsTrigger
+              value="advanced"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+            >
+              Advanced Settings
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="basic">
-          <Card>
-            <CardContent className="pt-6">
+          <div className="p-6">
+            <TabsContent value="basic" className="mt-0 border-0 p-0">
               <Form {...form}>
                 <form className="space-y-6">
                   <FormField
@@ -348,13 +422,9 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                   />
                 </form>
               </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="thumbnail">
-          <Card>
-            <CardContent className="pt-6">
+            <TabsContent value="thumbnail" className="mt-0 border-0 p-0">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium">Video Thumbnail</h3>
@@ -363,6 +433,53 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                     auto-generated one
                   </p>
 
+                  {/* Thumbnail Actions Toolbar */}
+                  {((thumbnailUrl && thumbnailUrl.includes("utfs.io")) ||
+                    video.muxPlaybackId) && (
+                    <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-slate-50 rounded-md border border-slate-100">
+                      <span className="text-sm font-medium mr-2">
+                        Thumbnail Actions:
+                      </span>
+
+                      <div className="flex flex-wrap gap-2">
+                        {/* Tombol reset ke auto-generated thumbnail */}
+                        {video.muxPlaybackId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleResetThumbnail}
+                            disabled={
+                              isUpdating ||
+                              updateThumbnail.isPending ||
+                              isDeleting
+                            }
+                            className="whitespace-nowrap"
+                          >
+                            Reset to Auto-generated
+                          </Button>
+                        )}
+
+                        {/* Tombol hapus thumbnail kustom */}
+                        {thumbnailUrl && thumbnailUrl.includes("utfs.io") && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleDeleteThumbnail}
+                            disabled={isDeleting || isUpdating}
+                            className="whitespace-nowrap"
+                          >
+                            {isDeleting ? (
+                              <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <TrashIcon className="mr-2 h-4 w-4" />
+                            )}
+                            Delete Custom Thumbnail
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Current thumbnail display */}
                     <div>
@@ -370,7 +487,7 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                         Current Thumbnail
                       </h4>
                       <div className="aspect-video relative rounded-lg overflow-hidden border border-border">
-                        {isUpdating ? (
+                        {isUpdating || isDeleting ? (
                           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
                             <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
                           </div>
@@ -391,25 +508,11 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                             }}
                           />
                         ) : (
-                          <div className="flex items-center justify-center h-full bg-muted">
+                          <div className="flex items-center justify-center h-full bg-slate-100">
                             <ImageIcon className="h-10 w-10 text-muted-foreground" />
                           </div>
                         )}
                       </div>
-
-                      {/* Auto-generated thumbnail option */}
-                      {video.muxPlaybackId && (
-                        <div className="mt-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleResetThumbnail}
-                            disabled={isUpdating || updateThumbnail.isPending}
-                          >
-                            Reset to Auto-generated
-                          </Button>
-                        </div>
-                      )}
                     </div>
 
                     {/* Upload custom thumbnail */}
@@ -420,18 +523,15 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                       <ThumbnailUploader
                         videoId={videoId}
                         onUploadComplete={handleThumbnailUpload}
+                        isDeleting={isDeleting}
                       />
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="advanced">
-          <Card>
-            <CardContent className="pt-6">
+            <TabsContent value="advanced" className="mt-0 border-0 p-0">
               <div className="space-y-8">
                 <div>
                   <h3 className="text-lg font-medium mb-2">Video URL</h3>
@@ -510,10 +610,10 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                   </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog
@@ -547,6 +647,6 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };

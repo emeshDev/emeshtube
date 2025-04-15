@@ -6,6 +6,10 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import {
+  deleteThumbnailFile,
+  deleteThumbnailByUrl,
+} from "@/lib/uploadthing-server";
 
 export const videosRouter = createTRPCRouter({
   create: protectedProcedure.mutation(async ({ ctx }) => {
@@ -219,6 +223,77 @@ export const videosRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to update thumbnail",
+        });
+      }
+    }),
+
+  deleteThumbnail: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        fileKey: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { id, fileKey } = input;
+      const { user } = ctx;
+
+      try {
+        // first, get video data with thumbnailUrl
+        const video = await db
+          .select({
+            id: videos.id,
+            thumbnailUrl: videos.thumbnailUrl,
+          })
+          .from(videos)
+          .where(and(eq(videos.id, id), eq(videos.userId, user.id)))
+          .limit(1);
+
+        if (!video.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Video not found or you dont have permission to update it",
+          });
+        }
+
+        const currentVideo = video[0];
+
+        if (fileKey) {
+          await deleteThumbnailFile(fileKey);
+        } else if (
+          currentVideo.thumbnailUrl &&
+          currentVideo.thumbnailUrl.includes("utfs.io")
+        ) {
+          await deleteThumbnailByUrl(currentVideo.thumbnailUrl);
+        }
+
+        const [updatedVideo] = await db
+          .update(videos)
+          .set({
+            thumbnailUrl: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(videos.id, id))
+          .returning();
+
+        if (!updatedVideo) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete thumbnail",
+          });
+        }
+
+        return updatedVideo;
+      } catch (error) {
+        console.error("Error deleting thumbnail:", error);
+
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to delete thumbnail",
         });
       }
     }),
