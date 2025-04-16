@@ -78,6 +78,7 @@ export const videosRouter = createTRPCRouter({
           .select({
             id: videos.id,
             muxAssetId: videos.muxAssetId,
+            thumbnailUrl: videos.thumbnailUrl,
           })
           .from(videos)
           .where(and(eq(videos.id, id), eq(videos.userId, user.id)))
@@ -92,6 +93,14 @@ export const videosRouter = createTRPCRouter({
         }
 
         const video = videoToDelete[0];
+
+        // deleting custom thumbnail from uploadthing
+        if (video.thumbnailUrl && video.thumbnailUrl.includes("utfs.io")) {
+          console.log(
+            `Deleting thumbnail for video ${id}: ${video.thumbnailUrl}`
+          );
+          await deleteThumbnailByUrl(video.thumbnailUrl);
+        }
 
         if (video.muxAssetId) {
           await mux.video.assets.delete(video.muxAssetId);
