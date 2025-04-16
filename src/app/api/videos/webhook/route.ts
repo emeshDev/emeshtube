@@ -13,6 +13,7 @@ import {
 import { mux } from "@/lib/mux";
 import { db } from "@/db";
 import { videos } from "@/db/schema";
+import { deleteThumbnailByUrl } from "@/lib/uploadthing-server";
 
 const SIGNING_SECRET = process.env.MUX_WEBHOOK_SECRET!;
 
@@ -345,6 +346,31 @@ export const POST = async (request: Request) => {
         if (!data.upload_id) {
           console.error("No upload ID found in webhook payload", data);
           return new Response("No upload ID found", { status: 400 });
+        }
+
+        const videoToDelete = await db
+          .select({
+            id: videos.id,
+            thumbnailUrl: videos.thumbnailUrl,
+          })
+          .from(videos)
+          .where(eq(videos.muxUploadId, data.upload_id))
+          .limit(1);
+
+        // Delete thumbnail from uploadthing too
+        if (
+          videoToDelete.length > 0 &&
+          videoToDelete[0].thumbnailUrl &&
+          videoToDelete[0].thumbnailUrl.includes("utfs.io")
+        ) {
+          console.log(
+            `Deleting thumbnail for video before deletion: ${videoToDelete[0].thumbnailUrl}`
+          );
+          try {
+            await deleteThumbnailByUrl(videoToDelete[0].thumbnailUrl);
+          } catch (error) {
+            console.error("Error deleting thumbnail:", error);
+          }
         }
 
         await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
