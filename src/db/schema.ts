@@ -59,6 +59,13 @@ export const videos = pgTable("videos", {
   muxPlaybackId: text("mux_playback_id").unique(),
   muxTrackId: text("mux_track_id").unique(),
   muxTrackStatus: text("mux_track_status"),
+  // Kolom untuk subtitle track
+  muxSubtitleTrackId: text("mux_subtitle_track_id").unique(),
+  muxSubtitleStatus: text("mux_subtitle_status"),
+
+  // Kolom untuk menyimpan konten subtitle
+  subtitleContent: text("subtitle_content"),
+
   thumbnailUrl: text("thumbnail_url"),
   previewUrl: text("preview_url"),
   duration: integer("duration").default(0).notNull(),

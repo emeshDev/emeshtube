@@ -384,23 +384,126 @@ export const POST = async (request: Request) => {
             asset_id: string;
           };
 
-        console.log("Track Ready");
+        console.log("Track Ready", data);
 
         const assetId = data.asset_id;
         const trackId = data.id;
         const status = data.status;
+        const trackType = data.type;
+        const textType = data.text_type;
+        const languageCode = data.language_code;
 
         if (!assetId) {
           return new Response("Missing asset ID", { status: 400 });
         }
 
-        await db
-          .update(videos)
-          .set({
-            muxTrackId: trackId,
-            muxTrackStatus: status,
-          })
-          .where(eq(videos.muxAssetId, assetId));
+        const isEnglishSubtitle =
+          trackType === "text" &&
+          textType === "subtitles" &&
+          languageCode === "en";
+
+        if (isEnglishSubtitle) {
+          try {
+            const videoInfo = await db
+              .select({ id: videos.id, muxPlaybackId: videos.muxPlaybackId })
+              .from(videos)
+              .where(eq(videos.muxAssetId, assetId))
+              .limit(1);
+
+            if (!videoInfo.length || !videoInfo[0].muxPlaybackId) {
+              console.error(
+                `[Webhook] Video with asset ID ${assetId} not found or missing playback ID`
+              );
+
+              await db
+                .update(videos)
+                .set({
+                  muxSubtitleTrackId: trackId,
+                  muxSubtitleStatus: status,
+                  updatedAt: new Date(),
+                })
+                .where(eq(videos.muxAssetId, assetId));
+
+              return new Response("Updated track ID only", { status: 200 });
+            }
+
+            const { id: videoId, muxPlaybackId } = videoInfo[0];
+            const { getSubtitleText, processSubtitleText } = await import(
+              "@/lib/mux-subtitle"
+            );
+            // Tunggu sebentar untuk memastikan transcript tersedia (kadang perlu waktu beberapa detik)
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            // Ambil konten subtitle dari URL publik
+            const rawSubtitleText = await getSubtitleText(
+              muxPlaybackId,
+              trackId
+            );
+
+            // Proses teks subtitle (hapus timestamp dll)
+            const subtitleContent = processSubtitleText(rawSubtitleText);
+
+            if (!subtitleContent) {
+              console.log(
+                `[Webhook] Empty subtitle content for video ${videoId}`
+              );
+
+              // Update track ID tapi tanpa konten subtitle
+              await db
+                .update(videos)
+                .set({
+                  muxSubtitleTrackId: trackId,
+                  muxSubtitleStatus: status,
+                  updatedAt: new Date(),
+                })
+                .where(eq(videos.muxAssetId, assetId));
+
+              return new Response("Updated track ID with empty subtitle", {
+                status: 200,
+              });
+            }
+
+            console.log(
+              `[Webhook] Extracted subtitle content (${subtitleContent.length} chars) for video ${videoId}`
+            );
+
+            // Update database dengan subtitle track ID dan kontennya
+            await db
+              .update(videos)
+              .set({
+                muxSubtitleTrackId: trackId,
+                muxSubtitleStatus: status,
+                subtitleContent: subtitleContent,
+                updatedAt: new Date(),
+              })
+              .where(eq(videos.muxAssetId, assetId));
+
+            console.log(
+              `[Webhook] Updated video ${videoId} with subtitle track ID and content`
+            );
+          } catch (error) {
+            console.error("Error getting subtitle content:", error);
+
+            // Update hanya track ID jika gagal mendapatkan konten
+            await db
+              .update(videos)
+              .set({
+                muxSubtitleTrackId: trackId,
+                muxSubtitleStatus: status,
+                updatedAt: new Date(),
+              })
+              .where(eq(videos.muxAssetId, assetId));
+          }
+        } else {
+          // Jika track lain (video/audio) atau subtitle bahasa lain, update track ID biasa
+          await db
+            .update(videos)
+            .set({
+              muxTrackId: trackId,
+              muxTrackStatus: status,
+            })
+            .where(eq(videos.muxAssetId, assetId));
+        }
 
         break;
       }

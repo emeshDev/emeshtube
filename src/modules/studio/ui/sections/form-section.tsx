@@ -15,6 +15,7 @@ import {
   ImageIcon,
   Loader2Icon,
   MoreVerticalIcon,
+  SparklesIcon,
   TrashIcon,
 } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -103,6 +104,49 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     undefined
   );
 
+  // State untuk pelacakan status workflow
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
+
+  // Fungsi untuk polling pemeriksaan perubahan judul
+  const startPollingForTitleChange = () => {
+    setIsGenerating(true);
+
+    const initialTitle = video.title;
+    let attempts = 0;
+    const maxAttempts = 20; // 20 x 3 detik = 60 detik maksimum
+
+    const checkInterval = setInterval(async () => {
+      attempts++;
+
+      // Invalidate dan refresh data video
+      await utils.studio.getOne.invalidate({ id: videoId });
+      const refreshedVideo = await utils.studio.getOne.fetch({ id: videoId });
+
+      // Cek apakah judul berubah
+      if (refreshedVideo.title !== initialTitle) {
+        clearInterval(checkInterval);
+        setIsGenerating(false);
+        setGeneratedTitle(refreshedVideo.title);
+
+        // Update form dengan judul baru
+        form.setValue("title", refreshedVideo.title, { shouldDirty: true });
+
+        toast.success(`New title generated: "${refreshedVideo.title}"`);
+        return;
+      }
+
+      // Hentikan polling jika mencapai batas maksimum
+      if (attempts >= maxAttempts) {
+        clearInterval(checkInterval);
+        setIsGenerating(false);
+        toast.warning(
+          "Title generation is taking longer than expected. Please check back later."
+        );
+      }
+    }, 3000); // Cek setiap 3 detik
+  };
+
   const form = useForm<FormValues>({
     resolver: zodResolver(updateVideoSchema),
     defaultValues: {
@@ -173,6 +217,27 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     },
   });
 
+  const generateTitle = trpc.videos.generateTitle.useMutation({
+    onSuccess: (data) => {
+      toast.success(
+        "Title generation started! The title will be updated in a few seconds."
+      );
+      setGeneratedTitle("Generating...");
+
+      // Mulai polling untuk memeriksa perubahan judul
+      startPollingForTitleChange();
+    },
+    onError: (error) => {
+      if (error.message === "No subtitle available for this video") {
+        toast.error("No subtitle available, cannot generate title by AI");
+      } else {
+        toast.error(`Error generating title: ${error.message}`);
+      }
+      setIsGenerating(false);
+      console.error(error);
+    },
+  });
+
   const onSubmit = (val: FormValues) => {
     updateVideo.mutate({ ...val, id: videoId });
   };
@@ -232,6 +297,14 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
         setIsCopied(false);
       }, 2000);
     }
+  };
+
+  // Handler untuk tombol generate
+  const handleGenerateTitle = () => {
+    if (isGenerating) return;
+
+    setIsGenerating(true);
+    generateTitle.mutate({ videoId });
   };
 
   // Ekstrak fileKey dari URL jika belum ada
@@ -337,11 +410,39 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                       <FormItem>
                         <FormLabel>Title</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value} />
+                          <div className="flex gap-2">
+                            <Input {...field} value={field.value} />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="shrink-0"
+                              onClick={handleGenerateTitle}
+                              disabled={isGenerating || generateTitle.isPending}
+                              title="Generate title with AI from subtitle"
+                            >
+                              {isGenerating || generateTitle.isPending ? (
+                                <Loader2Icon className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <SparklesIcon className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
+                        {isGenerating && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Generating title... This may take a few seconds.
+                          </p>
+                        )}
+                        {generatedTitle && !isGenerating && (
+                          <p className="text-xs text-primary font-medium mt-1 animate-pulse">
+                            New title generated!
+                          </p>
+                        )}
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
                     name="description"

@@ -27,6 +27,11 @@ A modern, serverless YouTube clone built with cutting-edge technologies. This pr
 - **[tRPC](https://trpc.io/)**: End-to-end typesafe APIs made easy, eliminating the need for traditional REST or GraphQL.
 - **[TanStack Query](https://tanstack.com/query/latest)** (formerly React Query): Data fetching and state management for tRPC calls.
 
+### AI & Background Processing
+
+- **[OpenAI](https://openai.com/)**: Leveraging GPT models to automatically generate SEO-friendly video titles from video transcripts.
+- **[Upstash Workflow & QStash](https://upstash.com/)**: Serverless workflow and message queue for managing asynchronous tasks like AI-powered title generation.
+
 ## ✨ Features
 
 - 📹 Video uploading, processing, and streaming
@@ -36,6 +41,8 @@ A modern, serverless YouTube clone built with cutting-edge technologies. This pr
 - 👍 Likes and subscriptions
 - 📱 Responsive design for all devices
 - 🔐 Secure authentication and authorization
+- 🤖 AI-powered title generation from video subtitles
+- ⚙️ Asynchronous background processing for long-running tasks
 
 ## 🏗️ Architecture Overview
 
@@ -47,6 +54,8 @@ This project follows a serverless architecture pattern:
 4. **Database**: Neon serverless Postgres with Drizzle ORM for data modeling
 5. **Video Processing**: Mux for video transcoding, delivery, and streaming
 6. **File Uploads**: Uploadthing for handling custom thumbnail uploads
+7. **AI Integration**: OpenAI for generating video titles from subtitle content
+8. **Background Processing**: Upstash Workflow for handling long-running AI tasks asynchronously
 
 ## 🔧 Getting Started
 
@@ -57,6 +66,8 @@ This project follows a serverless architecture pattern:
 - Clerk account
 - Uploadthing account
 - Neon Postgres database
+- OpenAI API key
+- Upstash account (for QStash and Workflow)
 
 ### Environment Variables
 
@@ -73,6 +84,7 @@ CLERK_SECRET_KEY=your_clerk_secret_key
 # Mux
 MUX_TOKEN_ID=your_mux_token_id
 MUX_TOKEN_SECRET=your_mux_token_secret
+MUX_WEBHOOK_SECRET=your_mux_webhook_secret
 
 # Uploadthing
 UPLOADTHING_SECRET=your_uploadthing_secret
@@ -80,6 +92,15 @@ UPLOADTHING_APP_ID=your_uploadthing_app_id
 
 # Database
 DATABASE_URL=your_neon_database_url
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# Upstash
+QSTASH_TOKEN=your_qstash_token
+QSTASH_CURRENT_SIGNING_KEY=your_qstash_current_signing_key
+QSTASH_NEXT_SIGNING_KEY=your_qstash_next_signing_key
+UPSTASH_WORKFLOW_URL=your_public_app_url
 ```
 
 ### Installation
@@ -100,8 +121,14 @@ npm run dev
 ```
 ├── src/
 │   ├── app/                  # Next.js App Router
+│   │   ├── api/              # API routes
+│   │   │   └── videos/       # Video-related API endpoints
+│   │   │       └── workflows/# Upstash Workflow endpoints
 │   ├── components/           # Shared React components
 │   ├── lib/                  # Utility functions
+│   │   ├── openai.ts         # OpenAI client configuration
+│   │   ├── mux-subtitle.ts   # Subtitle processing utilities
+│   │   └── workflow.ts       # Upstash Workflow client
 │   ├── trpc/                 # tRPC configuration and setup
 │   ├── db/                   # Drizzle configuration and schema
 │   ├── modules/              # Feature modules
@@ -127,6 +154,22 @@ This serverless tech stack offers several advantages:
 - **Performance**: Optimized for fast loading and video delivery
 - **Developer Experience**: Strong typing and modern tools for rapid development
 - **Maintenance**: Reduced DevOps overhead with managed services
+- **AI Integration**: Intelligent features powered by state-of-the-art language models
+- **Asynchronous Processing**: Background workloads handled efficiently with Upstash Workflow
+
+## 🤖 AI Features
+
+### Automatic Title Generation
+
+The platform automatically extracts subtitles from uploaded videos and uses OpenAI's language models to generate catchy, SEO-friendly titles based on the video content. This process:
+
+1. Extracts video subtitles from Mux auto-generated captions
+2. Processes and stores subtitle text in the database
+3. Uses Upstash Workflow to handle the asynchronous AI title generation
+4. Leverages OpenAI GPT models to create engaging titles
+5. Updates the video title automatically
+
+This feature showcases how AI can enhance content creation and reduce manual work for creators.
 
 ## 📚 Useful Resources
 
@@ -136,6 +179,8 @@ This serverless tech stack offers several advantages:
 - [Clerk Documentation](https://clerk.com/docs)
 - [tRPC Documentation](https://trpc.io/docs)
 - [Neon Documentation](https://neon.tech/docs)
+- [OpenAI API Documentation](https://platform.openai.com/docs)
+- [Upstash Workflow Documentation](https://upstash.com/docs/workflow/basics/context)
 
 ## 📝 License
 

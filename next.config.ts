@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.ufs.sh", // Gunakan wildcard untuk mencakup semua subdomain
       },
+      {
+        protocol: "https",
+        hostname: "stream.mux.com",
+      },
     ],
   },
 };

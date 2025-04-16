@@ -67,6 +67,69 @@ export const videosRouter = createTRPCRouter({
     }
   }),
 
+  generateTitle: protectedProcedure
+    .input(z.object({ videoId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const { videoId } = input;
+      const { user } = ctx;
+
+      try {
+        // Cek apakah video milik user
+        const videoExists = await db
+          .select({
+            id: videos.id,
+            subtitleContent: videos.subtitleContent,
+          })
+          .from(videos)
+          .where(and(eq(videos.id, videoId), eq(videos.userId, user.id)))
+          .limit(1);
+
+        if (!videoExists.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Video not found or you don't have permission",
+          });
+        }
+
+        // Cek apakah subtitle tersedia
+        if (!videoExists[0].subtitleContent) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No subtitle available for this video",
+          });
+        }
+
+        // Trigger workflow untuk generate title
+        const { triggerTitleGeneration } = await import("@/lib/workflow");
+        const result = await triggerTitleGeneration(videoId, user.id);
+
+        if (!result.success) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Failed to trigger title generation: ${result.error}`,
+          });
+        }
+
+        return {
+          success: true,
+          message: "Title generation started in background",
+          workflowRunId: result.workflowRunId,
+        };
+      } catch (error) {
+        console.error("Error triggering title generation:", error);
+
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error ? error.message : "Failed to generate title",
+        });
+      }
+    }),
+
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
