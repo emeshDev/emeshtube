@@ -193,7 +193,7 @@ export const videosRouter = createTRPCRouter({
 
       try {
         const videoExists = await db
-          .select({ id: videos.id })
+          .select({ id: videos.id, currentThumbnailUrl: videos.thumbnailUrl })
           .from(videos)
           .where(and(eq(videos.id, id), eq(videos.userId, user.id)))
           .limit(1);
@@ -203,6 +203,18 @@ export const videosRouter = createTRPCRouter({
             code: "NOT_FOUND",
             message: "Video not found or you dont have permission to update it",
           });
+        }
+
+        // if there is currentThumbnailUrl, delete it from uploadthing
+        if (
+          videoExists[0].currentThumbnailUrl &&
+          videoExists[0].currentThumbnailUrl.includes("utfs.io") &&
+          videoExists[0].currentThumbnailUrl !== thumbnailUrl
+        ) {
+          console.log(
+            `Deleting previous thumbnail: ${videoExists[0].currentThumbnailUrl}`
+          );
+          await deleteThumbnailByUrl(videoExists[0].currentThumbnailUrl);
         }
 
         const [updatedVideo] = await db
