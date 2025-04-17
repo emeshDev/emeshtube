@@ -27,7 +27,6 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -104,9 +103,12 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     undefined
   );
 
-  // State untuk pelacakan status workflow
+  // State untuk pelacakan status workflow Title
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
+  // State untuk pelacakan status workflow description
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [generatedDesc, setGeneratedDesc] = useState<string | null>(null);
 
   // Fungsi untuk polling pemeriksaan perubahan judul
   const startPollingForTitleChange = () => {
@@ -142,6 +144,46 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
         setIsGenerating(false);
         toast.warning(
           "Title generation is taking longer than expected. Please check back later."
+        );
+      }
+    }, 3000); // Cek setiap 3 detik
+  };
+
+  const startPollingForDescriptionChange = () => {
+    setIsGeneratingDesc(true);
+
+    const initialDesc = video.description || "";
+    let attempts = 0;
+    const maxAttempts = 30; // 30 x 3 detik = 90 detik maksimum (description lebih lama)
+
+    const checkInterval = setInterval(async () => {
+      attempts++;
+
+      // Invalidate dan refresh data video
+      await utils.studio.getOne.invalidate({ id: videoId });
+      const refreshedVideo = await utils.studio.getOne.fetch({ id: videoId });
+
+      // Cek apakah description berubah
+      if (refreshedVideo.description !== initialDesc) {
+        clearInterval(checkInterval);
+        setIsGeneratingDesc(false);
+        setGeneratedDesc(refreshedVideo.description);
+
+        // Update form dengan description baru
+        form.setValue("description", refreshedVideo.description || "", {
+          shouldDirty: true,
+        });
+
+        toast.success("New description generated successfully!");
+        return;
+      }
+
+      // Hentikan polling jika mencapai batas maksimum
+      if (attempts >= maxAttempts) {
+        clearInterval(checkInterval);
+        setIsGeneratingDesc(false);
+        toast.warning(
+          "Description generation is taking longer than expected. Please check back later."
         );
       }
     }, 3000); // Cek setiap 3 detik
@@ -238,6 +280,27 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
     },
   });
 
+  const generateDescription = trpc.videos.generateDescription.useMutation({
+    onSuccess: (data) => {
+      toast.success(
+        "Description generation started! The description will be updated in a few seconds."
+      );
+      setGeneratedDesc("Generating...");
+
+      // Mulai polling untuk memeriksa perubahan description
+      startPollingForDescriptionChange();
+    },
+    onError: (error) => {
+      if (error.message === "No subtitle available for this video") {
+        toast.error("No subtitle available, cannot generate description by AI");
+      } else {
+        toast.error(`Error generating description: ${error.message}`);
+      }
+      setIsGeneratingDesc(false);
+      console.error(error);
+    },
+  });
+
   const onSubmit = (val: FormValues) => {
     updateVideo.mutate({ ...val, id: videoId });
   };
@@ -305,6 +368,12 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
 
     setIsGenerating(true);
     generateTitle.mutate({ videoId });
+  };
+  const handleGenerateDescription = () => {
+    if (isGeneratingDesc) return;
+
+    setIsGeneratingDesc(true);
+    generateDescription.mutate({ videoId });
   };
 
   // Ekstrak fileKey dari URL jika belum ada
@@ -448,15 +517,53 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Description</FormLabel>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            onClick={handleGenerateDescription}
+                            disabled={
+                              isGeneratingDesc || generateDescription.isPending
+                            }
+                          >
+                            {isGeneratingDesc ||
+                            generateDescription.isPending ? (
+                              <>
+                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <SparklesIcon className="mr-2 h-4 w-4" />
+                                Generate with AI
+                              </>
+                            )}
+                          </Button>
+                        </div>
                         <FormControl>
                           <Textarea
                             {...field}
-                            rows={5}
+                            rows={10}
                             placeholder="Describe your video..."
                             value={field.value || ""}
+                            disabled={isGeneratingDesc}
+                            className={isGeneratingDesc ? "bg-muted" : ""}
                           />
                         </FormControl>
+                        {isGeneratingDesc && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Generating description... This may take up to a
+                            minute.
+                          </p>
+                        )}
+                        {generatedDesc && !isGeneratingDesc && (
+                          <p className="text-xs text-primary font-medium mt-1 animate-pulse">
+                            New description generated!
+                          </p>
+                        )}
                         <FormDescription>
                           Add details about your videos to help viewers find it
                         </FormDescription>

@@ -32,3 +32,28 @@ export const triggerTitleGeneration = async (
     return { success: false, error: (error as Error).message };
   }
 };
+
+/**
+ * Trigger workflow untuk generate description berdasarkan subtitle
+ * @param videoId ID video
+ * @param userId ID user pemilik video
+ * @returns Object with success status and workflow run ID or error
+ */
+export const triggerDescriptionGeneration = async (
+  videoId: string,
+  userId: string
+) => {
+  try {
+    const { workflowRunId } = await workflow.trigger({
+      url: `${process.env.UPSTASH_WORKFLOW_URL}/api/videos/workflows/description`,
+      body: { videoId, userId },
+    });
+    console.log(
+      `Description generation workflow triggered with ID: ${workflowRunId}`
+    );
+    return { success: true, workflowRunId };
+  } catch (error) {
+    console.error("Failed to trigger description generation workflow:", error);
+    return { success: false, error: (error as Error).message };
+  }
+};
