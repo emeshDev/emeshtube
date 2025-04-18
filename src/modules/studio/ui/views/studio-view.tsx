@@ -2,9 +2,10 @@ import { VideosSection } from "../sections/videos-section";
 
 type Props = {
   categoryId?: string | undefined;
+  refreshParam?: string;
 };
 
-export const StudioView = ({ categoryId }: Props) => {
+export const StudioView = ({ categoryId, refreshParam }: Props) => {
   return (
     <>
       <div className="flex flex-col gap-y-6 pt-2.5">
@@ -14,7 +15,7 @@ export const StudioView = ({ categoryId }: Props) => {
             Manage your channel content and videos
           </p>
         </div>
-        <VideosSection categoryId={categoryId} />
+        <VideosSection categoryId={categoryId} refreshParam={refreshParam} />
       </div>
     </>
   );

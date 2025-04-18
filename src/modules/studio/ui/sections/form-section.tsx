@@ -110,6 +110,8 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [generatedDesc, setGeneratedDesc] = useState<string | null>(null);
 
+  const [isDeletingVideo, setIsDeletingVideo] = useState(false);
+
   // Fungsi untuk polling pemeriksaan perubahan judul
   const startPollingForTitleChange = () => {
     setIsGenerating(true);
@@ -243,17 +245,27 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
   });
 
   const deleteVideo = trpc.videos.delete.useMutation({
+    onMutate: () => {
+      // Aktifkan overlay loading
+      setIsDeletingVideo(true);
+      // Tutup dialog konfirmasi
+      setIsDeleteDialogOpen(false);
+    },
     onSuccess: () => {
       toast.success("Video deleted successfully");
+
+      // Invalidate queries untuk refresh data
       utils.studio.infiniteVideos.invalidate();
-      localStorage.setItem("videoDeleted", "true");
-      // window.location.href = "/studio";
-      // router.push("/studio");
-      // Force a completely new request to the server with a timestamp parameter
-      const timestamp = Date.now();
-      window.location.replace(`/studio?t=${timestamp}`);
+
+      // Tunda redirect untuk memberi waktu toast muncul dan server memproses
+      setTimeout(() => {
+        // Redirect dengan parameter refresh
+        const timestamp = Date.now();
+        window.location.href = `/studio?refresh=${timestamp}`;
+      }, 1500); // Tunggu 1.5 detik sebelum redirect
     },
     onError: (err) => {
+      setIsDeletingVideo(false);
       toast.error("Error deleting video");
       console.error(err);
     },
@@ -855,6 +867,19 @@ const FormViewSuspense = ({ videoId }: PageProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Deleting Video Overlay */}
+      {isDeletingVideo && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-background rounded-lg p-8 shadow-lg flex flex-col items-center gap-4">
+            <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-lg font-medium">Deleting video...</p>
+            <p className="text-sm text-muted-foreground">
+              Please wait while your video is being deleted.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

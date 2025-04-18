@@ -21,6 +21,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 type Props = {
   categoryId?: string | undefined;
+  refreshParam?: string;
 };
 
 export const VideosSection = ({ categoryId }: Props) => {
@@ -70,7 +71,7 @@ const VideosSectionSkeleton = () => {
   );
 };
 
-const VideosSectionSuspense = ({ categoryId }: Props) => {
+const VideosSectionSuspense = ({ categoryId, refreshParam }: Props) => {
   const utils = trpc.useUtils();
 
   const [videos, query] = trpc.studio.infiniteVideos.useSuspenseInfiniteQuery(
@@ -110,14 +111,23 @@ const VideosSectionSuspense = ({ categoryId }: Props) => {
     }
   }, [videos, utils.studio.infiniteVideos]);
 
-  // pembersih localstorage untuk video yang terhapus
+  // Effect untuk refresh data saat parameter refresh berubah
   useEffect(() => {
-    const deleted = localStorage.getItem("videoDeleted");
-    if (deleted === "true") {
-      localStorage.removeItem("videoDeleted");
-      window.location.reload();
+    if (refreshParam) {
+      console.log("Refreshing video data from delete action");
+      // Invalidate dan refetch data video
+      utils.studio.infiniteVideos.invalidate();
     }
-  }, []);
+  }, [refreshParam, utils.studio.infiniteVideos]);
+
+  // pembersih localstorage untuk video yang terhapus
+  // useEffect(() => {
+  //   const deleted = localStorage.getItem("videoDeleted");
+  //   if (deleted === "true") {
+  //     localStorage.removeItem("videoDeleted");
+  //     window.location.reload();
+  //   }
+  // }, []);
 
   return (
     <div>

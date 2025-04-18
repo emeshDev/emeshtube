@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 // Gunakan "uploadthing" bukan "uploadthing/server"
-import { createUploadthing, type FileRouter } from "uploadthing";
+import { createUploadthing, type FileRouter } from "uploadthing/next";
 
 // Note: Karena @/lib/clerk-auth belum dibuat, kita akan menggunakan auth dari Next.js
 // untuk saat ini. Kalau sudah siap migrasi ke Workers, baru buat implementasi penuh.
