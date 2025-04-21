@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { format, formatDistanceToNow } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -146,4 +147,70 @@ export const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
 
   return text.substring(0, maxLength) + "...";
+};
+
+/**
+ * Format angka menjadi format yang lebih mudah dibaca (1K, 1M, dll)
+ *
+ * @param num Angka yang akan diformat
+ * @returns String dalam format yang mudah dibaca
+ *
+ * @example
+ * formatNumber(1000) // => "1K"
+ * formatNumber(1500) // => "1.5K"
+ * formatNumber(1000000) // => "1M"
+ */
+export const formatNumber = (num: number | null | undefined): string => {
+  if (num === null || num === undefined || num === 0) return "0";
+
+  if (num < 1000) return num.toString();
+
+  const units = ["", "K", "M", "B", "T"];
+  const order = Math.floor(Math.log10(num) / 3);
+
+  const unitValue = Math.pow(10, order * 3);
+  const value = num / unitValue;
+
+  // Format dengan satu desimal jika tidak bulat
+  const formattedValue = Number.isInteger(value)
+    ? value.toString()
+    : value.toFixed(1);
+
+  return `${formattedValue}${units[order]}`;
+};
+
+/**
+ * Format tanggal relatif (misalnya "3 hari yang lalu")
+ *
+ * @param date Tanggal yang akan diformat
+ * @returns String dalam format relatif
+ *
+ * @example
+ * formatRelativeTime(new Date(Date.now() - 86400000)) // => "1 day ago"
+ */
+export const formatRelativeTime = (date: Date): string => {
+  try {
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (error) {
+    console.error("Error formatting relative time:", error);
+    return "beberapa waktu lalu";
+  }
+};
+
+/**
+ * Format tanggal dalam format standar
+ *
+ * @param date Tanggal yang akan diformat
+ * @returns String dalam format standar
+ *
+ * @example
+ * formatDate(new Date()) // => "Apr 21, 2023"
+ */
+export const formatDate = (date: Date): string => {
+  try {
+    return format(date, "d MMM yyyy");
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "tanggal tidak diketahui";
+  }
 };

@@ -1,17 +1,176 @@
 import { db } from "@/db";
-import { videos } from "@/db/schema";
+import { users, videos } from "@/db/schema";
 import { mux } from "@/lib/mux";
 import { updateThumbnailSchema, updateVideoSchema } from "@/lib/schema/video";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   deleteThumbnailFile,
   deleteThumbnailByUrl,
 } from "@/lib/uploadthing-server";
 
+// Gunakan Map untuk melacak ID video yang baru saja dilihat untuk menghindari double count
+const recentViews = new Map<string, Set<string>>();
+
+// Bersihkan data yang lebih lama dari 30 menit secara berkala
+setInterval(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+
+  for (const [videoId, viewers] of recentViews.entries()) {
+    if (viewers.size === 0) {
+      recentViews.delete(videoId);
+    }
+  }
+}, 10 * 60 * 1000); // Bersihkan setiap 10 menit
+
 export const videosRouter = createTRPCRouter({
+  getById: baseProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const { id } = input;
+      try {
+        // get video with creator information
+        const result = await db
+          .select({
+            video: videos,
+            creator: {
+              id: users.id,
+              name: users.name,
+              imageUrl: users.imageUrl,
+            },
+          })
+          .from(videos)
+          .leftJoin(users, eq(videos.userId, users.id))
+          .where(eq(videos.id, id))
+          .limit(1);
+
+        if (!result.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Video not found",
+          });
+        }
+
+        return result[0];
+      } catch (error) {
+        console.error("Error fetching video:", error);
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch video",
+        });
+      }
+    }),
+  // Procedure terpisah untuk increment view count
+  incrementViewCount: baseProcedure
+    .input(
+      z.object({
+        videoId: z.string().uuid(),
+        viewerId: z.string().optional(), // ID opsional untuk mengidentifikasi viewer
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { videoId, viewerId } = input;
+
+      try {
+        // Jika tidak ada viewerId, selalu increment (untuk pengguna yang tidak login)
+        if (!viewerId) {
+          await db
+            .update(videos)
+            .set({ viewCount: sql`${videos.viewCount}+1` })
+            .where(eq(videos.id, videoId));
+          return { success: true };
+        }
+
+        // Periksa apakah pengguna ini sudah dihitung untuk video ini
+        if (!recentViews.has(videoId)) {
+          recentViews.set(videoId, new Set());
+        }
+
+        const viewers = recentViews.get(videoId)!;
+
+        // Jika user belum dihitung sebagai view dalam 30 menit terakhir
+        if (!viewers.has(viewerId)) {
+          // Tambahkan view count
+          await db
+            .update(videos)
+            .set({ viewCount: sql`${videos.viewCount}+1` })
+            .where(eq(videos.id, videoId));
+
+          // Tandai user ini sudah melihat video dalam 30 menit terakhir
+          viewers.add(viewerId);
+
+          // Set timeout untuk menghapus user dari daftar setelah 30 menit
+          setTimeout(() => {
+            const viewersSet = recentViews.get(videoId);
+            if (viewersSet) {
+              viewersSet.delete(viewerId);
+            }
+          }, 30 * 60 * 1000); // 30 menit
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error incrementing view count:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update view count",
+        });
+      }
+    }),
+  // Get related videos procedure (same category, excluding current video)
+  getRelated: baseProcedure
+    .input(
+      z.object({
+        videoId: z.string().uuid(),
+        categoryId: z.string().uuid().optional(),
+        limit: z.number().min(1).max(20).default(5),
+      })
+    )
+    .query(async ({ input }) => {
+      const { videoId, categoryId, limit } = input;
+
+      try {
+        // Build query conditions
+        const conditions = [sql`${videos.id} != ${videoId}`];
+        if (categoryId) {
+          conditions.push(eq(videos.categoryId, categoryId));
+        }
+
+        // Get related videos with creator info
+        const relatedVideos = await db
+          .select({
+            video: videos,
+            creator: {
+              id: users.id,
+              name: users.name,
+              imageUrl: users.imageUrl,
+            },
+          })
+          .from(videos)
+          .leftJoin(users, eq(videos.userId, users.id))
+          .where(and(...conditions))
+          .orderBy(desc(videos.createdAt))
+          .limit(limit);
+
+        return relatedVideos;
+      } catch (error) {
+        console.error("Error fetching related videos:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch related videos",
+        });
+      }
+    }),
   create: protectedProcedure.mutation(async ({ ctx }) => {
     const { id: userId } = ctx.user;
 
