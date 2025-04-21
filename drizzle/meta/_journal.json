@@ -78,6 +78,13 @@
       "when": 1745218405586,
       "tag": "0010_nasty_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1745236298627,
+      "tag": "0011_typical_crystal",
+      "breakpoints": true
     }
   ]
 }

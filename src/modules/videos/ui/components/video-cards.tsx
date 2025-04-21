@@ -61,7 +61,7 @@ export const VideoCard = ({
 
   // Regular layout for grid/list views
   return (
-    <Link href={`/videos/${video.id}`} className="block group">
+    <Link href={`/watch/${video.id}`} className="block group">
       <VideoThumbnail
         thumbnailUrl={video.thumbnailUrl}
         previewUrl={video.previewUrl}

@@ -12,6 +12,7 @@ import { RelatedVideos } from "@/modules/videos/ui/components/related-videos";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
+import { SubscribeButton } from "@/modules/subscriptions/ui/components/SubscribeButton";
 
 interface VideoDetailViewProps {
   videoId: string;
@@ -129,6 +130,7 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
                 </Avatar>
                 <div>
                   <p className="font-medium">{creator.name}</p>
+                  <SubscribeButton creatorId={creator.id} />
                 </div>
               </div>
 

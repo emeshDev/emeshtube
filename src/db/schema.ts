@@ -150,6 +150,36 @@ export const videoLikesRelations = relations(videoLikes, ({ one }) => ({
   }),
 }));
 
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    subscriberId: uuid("subscriber_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    notificationsEnabled: boolean("notifications_enabled")
+      .default(false)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.subscriberId, t.creatorId] })]
+);
+
+export const subscriptionsRelation = relations(subscriptions, ({ one }) => ({
+  subscriber: one(users, {
+    fields: [subscriptions.subscriberId],
+    references: [users.id],
+    relationName: "subscriber_relation",
+  }),
+  creator: one(users, {
+    fields: [subscriptions.creatorId],
+    references: [users.id],
+    relationName: "creator_relation",
+  }),
+}));
+
 export const videosRelationsAddition = relations(videos, ({ many }) => ({
   comments: many(comments),
   likes: many(videoLikes),
@@ -158,4 +188,6 @@ export const videosRelationsAddition = relations(videos, ({ many }) => ({
 export const usersRelationsAddition = relations(users, ({ many }) => ({
   comments: many(comments),
   videoLikes: many(videoLikes),
+  subscribers: many(subscriptions, { relationName: "creator_relation" }),
+  subscriptions: many(subscriptions, { relationName: "subscriber_relation" }),
 }));
