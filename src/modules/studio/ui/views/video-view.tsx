@@ -37,7 +37,9 @@ const VideoPlayerWrapper = ({ videoId }: PageProps) => {
     );
   }
 
-  return <VideoPlayer playbackId={video.muxPlaybackId} />;
+  return (
+    <VideoPlayer playbackId={video.muxPlaybackId} videoTitle={video.title} />
+  );
 };
 
 const VideoPlayerSkeleton = () => {

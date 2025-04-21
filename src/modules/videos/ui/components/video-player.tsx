@@ -4,9 +4,10 @@ import MuxPlayer from "@mux/mux-player-react";
 
 interface VideoPlayerProps {
   playbackId: string;
+  videoTitle?: string;
 }
 
-export const VideoPlayer = ({ playbackId }: VideoPlayerProps) => {
+export const VideoPlayer = ({ playbackId, videoTitle }: VideoPlayerProps) => {
   return (
     <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
       <MuxPlayer
@@ -15,7 +16,7 @@ export const VideoPlayer = ({ playbackId }: VideoPlayerProps) => {
         accentColor="#0F172A"
         className="w-full h-full"
         metadata={{
-          video_title: "Video Preview",
+          video_title: videoTitle,
         }}
       />
     </div>
