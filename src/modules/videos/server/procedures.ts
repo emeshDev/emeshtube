@@ -70,6 +70,93 @@ export const videosRouter = createTRPCRouter({
         });
       }
     }),
+
+  getHomeVideos: baseProcedure
+    .input(
+      z.object({
+        categoryId: z.string().uuid().optional(),
+        cursor: z.string().uuid().optional(),
+        limit: z.number().min(1).max(50).default(16),
+      })
+    )
+    .query(async ({ input }) => {
+      const { categoryId, cursor, limit } = input;
+
+      try {
+        // Build query conditions
+        const conditions = [eq(videos.visibility, "public")];
+
+        if (categoryId) {
+          conditions.push(eq(videos.categoryId, categoryId));
+        }
+
+        if (cursor) {
+          const cursorVideo = await db
+            .select({ createdAt: videos.createdAt })
+            .from(videos)
+            .where(eq(videos.id, cursor))
+            .limit(1);
+
+          if (cursorVideo.length > 0) {
+            conditions.push(
+              sql`(${videos.createdAt},${videos.id})<(${cursorVideo[0].createdAt},${cursor})`
+            );
+          }
+        }
+
+        // Get videos with creators
+        const videosWithCreators = await db
+          .select({
+            video: {
+              id: videos.id,
+              title: videos.title,
+              thumbnailUrl: videos.thumbnailUrl,
+              createdAt: videos.createdAt,
+              viewCount: videos.viewCount,
+              duration: videos.duration,
+              visibility: videos.visibility,
+              userId: videos.userId,
+              categoryId: videos.categoryId,
+            },
+            creator: {
+              id: users.id,
+              name: users.name,
+              imageUrl: users.imageUrl,
+            },
+          })
+          .from(videos)
+          .leftJoin(users, eq(videos.userId, users.id))
+          .where(and(...conditions))
+          .orderBy(desc(videos.createdAt), desc(videos.id))
+          .limit(limit + 1); // Fetch one extra to determine if there are more
+
+        // Filter out any items with null creators (in case there are orphaned videos)
+        const validVideos = videosWithCreators.filter(
+          (item) => item.creator && item.creator.id !== null
+        );
+
+        const hasNextPage = validVideos.length > limit;
+        const videosList = hasNextPage
+          ? videosWithCreators.slice(0, limit)
+          : videosWithCreators;
+
+        const nextCursor =
+          hasNextPage && videosList.length > 0
+            ? videosList[videosList.length - 1].video.id
+            : undefined;
+
+        return {
+          videos: videosList,
+          nextCursor,
+        };
+      } catch (error) {
+        console.error("Error fetching home videos:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch home videos",
+        });
+      }
+    }),
   // Procedure terpisah untuk increment view count
   incrementViewCount: baseProcedure
     .input(
