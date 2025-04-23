@@ -16,3 +16,4 @@ export const CATEGORY_NAMES = [
   "Travel and events",
 ];
 export const CHANNEL_VIDEOS_LIMIT = 12;
+export const SEARCH_VIDEOS_LIMIT = 16;
