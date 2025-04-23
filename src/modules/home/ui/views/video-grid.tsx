@@ -4,7 +4,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { formatNumber, formatRelativeTime, formatDuration } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
-import { Eye } from "lucide-react";
+import { Eye, Lock } from "lucide-react";
 
 interface Creator {
   id: string;
@@ -53,6 +53,14 @@ const VideoItem = ({ video, creator }: VideoItemProps) => {
               {video.duration && (
                 <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 py-0.5 rounded">
                   {formatDuration(video.duration)}
+                </div>
+              )}
+
+              {/* Add visibility indicator for private videos */}
+              {video.visibility === "private" && (
+                <div className="absolute top-2 left-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  <span>Private</span>
                 </div>
               )}
             </>

@@ -15,3 +15,4 @@ export const CATEGORY_NAMES = [
   "Sports",
   "Travel and events",
 ];
+export const CHANNEL_VIDEOS_LIMIT = 12;

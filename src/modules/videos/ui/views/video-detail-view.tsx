@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { SubscribeButton } from "@/modules/subscriptions/ui/components/SubscribeButton";
+import Link from "next/link";
 
 interface VideoDetailViewProps {
   videoId: string;
@@ -122,12 +123,14 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
 
             <div className="flex flex-wrap items-center justify-between gap-y-4">
               <div className="flex items-center space-x-4">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={creator.imageUrl || undefined} />
-                  <AvatarFallback>
-                    {creator.name?.charAt(0) || "U"}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href={`/channel/${creator.id}`}>
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={creator.imageUrl || undefined} />
+                    <AvatarFallback>
+                      {creator.name?.charAt(0) || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div>
                   <p className="font-medium">{creator.name}</p>
                   <SubscribeButton creatorId={creator.id} />
