@@ -12,7 +12,7 @@ import {
 } from "@mux/mux-node/resources/webhooks";
 import { mux } from "@/lib/mux";
 import { db } from "@/db";
-import { videos } from "@/db/schema";
+import { videos, watchHistory } from "@/db/schema";
 import { deleteThumbnailByUrl } from "@/lib/uploadthing-server";
 import Pusher from "pusher";
 
@@ -375,6 +375,18 @@ export const POST = async (request: Request) => {
         }
 
         const videoId = videoToDelete.length > 0 ? videoToDelete[0].id : null;
+
+        if (videoId) {
+          try {
+            // Hapus entri watch history terkait video ini
+            console.log(`Deleting watch history entries for video: ${videoId}`);
+            await db
+              .delete(watchHistory)
+              .where(eq(watchHistory.videoId, videoId));
+          } catch (error) {
+            console.error("Error deleting watch history entries:", error);
+          }
+        }
 
         await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
 

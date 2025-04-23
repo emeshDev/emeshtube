@@ -17,3 +17,4 @@ export const CATEGORY_NAMES = [
 ];
 export const CHANNEL_VIDEOS_LIMIT = 12;
 export const SEARCH_VIDEOS_LIMIT = 16;
+export const HISTORY_VIDEOS_LIMIT = 16;

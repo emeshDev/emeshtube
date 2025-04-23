@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { SubscribeButton } from "@/modules/subscriptions/ui/components/SubscribeButton";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface VideoDetailViewProps {
   videoId: string;
@@ -22,6 +23,8 @@ interface VideoDetailViewProps {
 export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [viewCounted, setViewCounted] = useState(false);
+  const [historyAdded, setHistoryAdded] = useState(false);
+  const [playStarted, setPlayStarted] = useState(false);
 
   // Get user info
   const { user } = useUser();
@@ -53,17 +56,67 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
   // View count mutation
   const viewMutation = trpc.videos.incrementViewCount.useMutation();
 
-  // Increment view count once when page is loaded
+  // Watch history mutation
+  const addToHistoryMutation = trpc.history.addToHistory.useMutation({
+    onSuccess: () => {
+      // console.log("✅ Successfully added to history");
+      toast.success("Added to watch history", {
+        id: "history-success",
+        duration: 1500,
+      });
+    },
+    onError: (error) => {
+      console.error("❌ Error adding to history:", error);
+      toast.error(`Failed to add to history: ${error.message}`, {
+        id: "history-error",
+      });
+    },
+  });
+
+  // Handle video playback start
+  const handleVideoPlay = () => {
+    // console.log("Video play detected");
+    setPlayStarted(true);
+  };
+
+  // Debug log untuk memeriksa status user
+  // useEffect(() => {
+  //   console.log("Auth status:", {
+  //     isSignedIn,
+  //     userId: user?.id,
+  //     historyAdded,
+  //     playStarted,
+  //   });
+  // }, [isSignedIn, user, historyAdded, playStarted]);
+
+  // Increment view count saat halaman dimuat
   useEffect(() => {
-    // Only increment view count once per session
     if (!viewCounted && videoId) {
+      // console.log("📊 Incrementing view count...");
+      // Increment view count
       viewMutation.mutate({
         videoId,
-        viewerId: user?.id, // Pass the user ID if available
+        viewerId: user?.id,
       });
       setViewCounted(true);
     }
   }, [videoId, user?.id, viewCounted, viewMutation]);
+
+  // Tambahkan ke history saat video mulai diputar
+  useEffect(() => {
+    if (playStarted && isSignedIn && user?.id && !historyAdded) {
+      // console.log("🎬 Video played, adding to history for videoId:", videoId);
+      addToHistoryMutation.mutate({ videoId });
+      setHistoryAdded(true);
+    }
+  }, [
+    playStarted,
+    isSignedIn,
+    user?.id,
+    videoId,
+    historyAdded,
+    addToHistoryMutation,
+  ]);
 
   // Like/dislike mutation
   const utils = trpc.useUtils();
@@ -84,6 +137,18 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
 
     likeMutation.mutate({ videoId, isLike });
   };
+
+  // Manual trigger untuk menambahkan ke history
+  // const forceAddToHistory = () => {
+  //   if (isSignedIn && user?.id) {
+  //     console.log("🔄 Manually adding to history...");
+  //     addToHistoryMutation.mutate({ videoId });
+  //     setHistoryAdded(true);
+  //   } else {
+  //     console.log("⚠️ Cannot add to history, user not signed in");
+  //     toast.error("Please sign in to add to history");
+  //   }
+  // };
 
   const video = videoData?.video;
   const creator = videoData?.creator;
@@ -115,6 +180,7 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
           <VideoPlayer
             playbackId={video.muxPlaybackId || ""}
             videoTitle={video.title}
+            onPlay={handleVideoPlay}
           />
 
           {/* Video info */}
@@ -181,6 +247,16 @@ export const VideoDetailView = ({ videoId }: VideoDetailViewProps) => {
                 <ThumbsDown className="h-4 w-4" />
                 <span>{formatNumber(likeStats?.dislikes || 0)}</span>
               </Button>
+
+              {/* Debug button */}
+              {/* <Button
+                variant="outline"
+                size="sm"
+                onClick={forceAddToHistory}
+                className="ml-4 bg-blue-500 text-white text-xs"
+              >
+                Add to History
+              </Button> */}
             </div>
 
             {/* Description */}

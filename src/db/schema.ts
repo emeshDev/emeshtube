@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -180,9 +181,42 @@ export const subscriptionsRelation = relations(subscriptions, ({ one }) => ({
   }),
 }));
 
+export const watchHistory = pgTable(
+  "watch_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Indeks untuk query yang cepat saat mencari history berdasarkan user
+    index("watch_history_user_id_idx").on(table.userId),
+    // Indeks gabungan untuk memastikan kita dapat dengan cepat mencari kombinasi userId dan videoId
+    index("watch_history_user_video_idx").on(table.userId, table.videoId),
+  ]
+);
+
+export const watchHistoryRelations = relations(watchHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [watchHistory.userId],
+    references: [users.id],
+  }),
+  video: one(videos, {
+    fields: [watchHistory.videoId],
+    references: [videos.id],
+  }),
+}));
+
 export const videosRelationsAddition = relations(videos, ({ many }) => ({
   comments: many(comments),
   likes: many(videoLikes),
+  watchHistory: many(watchHistory),
 }));
 
 export const usersRelationsAddition = relations(users, ({ many }) => ({
@@ -190,4 +224,5 @@ export const usersRelationsAddition = relations(users, ({ many }) => ({
   videoLikes: many(videoLikes),
   subscribers: many(subscriptions, { relationName: "creator_relation" }),
   subscriptions: many(subscriptions, { relationName: "subscriber_relation" }),
+  watchHistory: many(watchHistory),
 }));

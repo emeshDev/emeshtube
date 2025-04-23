@@ -2,6 +2,7 @@ import { createTRPCRouter } from "../init";
 import { categoriesRouter } from "@/modules/categories/server/procedure";
 import { channelRouter } from "@/modules/channel/server/procedures";
 import { commentsRouter } from "@/modules/comments/server/procedures";
+import { historyRouter } from "@/modules/history/server/procedures";
 import { likesRouter } from "@/modules/likes/server/procedures";
 import { searchRouter } from "@/modules/search/server/procedures";
 import { studioRouter } from "@/modules/studio/server/procedures";
@@ -17,6 +18,7 @@ export const appRouter = createTRPCRouter({
   subscriptions: subscriptionsRouter,
   channel: channelRouter,
   search: searchRouter,
+  history: historyRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;
