@@ -5,6 +5,7 @@ import { InfiniteScroll } from "@/modules/videos/ui/components/infinite-scroll";
 import { trpc } from "@/trpc/client";
 import { useEffect, useState } from "react";
 import { VideoGrid } from "../views/video-grid";
+import { usePusher } from "@/hooks/usePusher";
 
 interface VideosSectionProps {
   categoryId?: string;
@@ -32,6 +33,7 @@ export const VideosSection = ({ categoryId }: VideosSectionProps) => {
   const [prevCategoryId, setPrevCategoryId] = useState<string | undefined>(
     categoryId
   );
+  const { deletedVideoIds } = usePusher();
 
   // Update loading state when category changes
   useEffect(() => {
@@ -88,7 +90,9 @@ export const VideosSection = ({ categoryId }: VideosSectionProps) => {
   const videos =
     videosData?.pages
       .flatMap((page) => page.videos)
-      .filter((item) => item.creator !== null) || [];
+      .filter(
+        (item) => item.creator !== null && !deletedVideoIds.has(item.video.id)
+      ) || [];
 
   // Show skeleton when:
   // 1. Initial loading

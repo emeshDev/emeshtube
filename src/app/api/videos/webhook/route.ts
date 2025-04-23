@@ -14,6 +14,7 @@ import { mux } from "@/lib/mux";
 import { db } from "@/db";
 import { videos } from "@/db/schema";
 import { deleteThumbnailByUrl } from "@/lib/uploadthing-server";
+import Pusher from "pusher";
 
 const SIGNING_SECRET = process.env.MUX_WEBHOOK_SECRET!;
 
@@ -373,7 +374,27 @@ export const POST = async (request: Request) => {
           }
         }
 
+        const videoId = videoToDelete.length > 0 ? videoToDelete[0].id : null;
+
         await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
+
+        if (videoId) {
+          try {
+            const pusher = new Pusher({
+              appId: process.env.PUSHER_APP_ID!,
+              key: process.env.PUSHER_KEY!,
+              secret: process.env.PUSHER_SECRET!,
+              cluster: process.env.PUSHER_CLUSTER!,
+              useTLS: true,
+            });
+
+            await pusher.trigger("videos-channel", "video-deleted", {
+              videoId,
+            });
+          } catch (error) {
+            console.error("Error triggering Pusher event:", error);
+          }
+        }
 
         break;
       }

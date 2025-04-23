@@ -14,6 +14,7 @@ import {
   deleteThumbnailFile,
   deleteThumbnailByUrl,
 } from "@/lib/uploadthing-server";
+import Pusher from "pusher";
 
 // Gunakan Map untuk melacak ID video yang baru saja dilihat untuk menghindari double count
 const recentViews = new Map<string, Set<string>>();
@@ -491,6 +492,22 @@ export const videosRouter = createTRPCRouter({
               code: "INTERNAL_SERVER_ERROR",
               message: "Failed to delete video",
             });
+          }
+
+          try {
+            const pusher = new Pusher({
+              appId: process.env.PUSHER_APP_ID!,
+              key: process.env.PUSHER_KEY!,
+              secret: process.env.PUSHER_SECRET!,
+              cluster: process.env.PUSHER_CLUSTER!,
+              useTLS: true,
+            });
+
+            await pusher.trigger("videos-channel", "video-deleted", {
+              videoId: id,
+            });
+          } catch (error) {
+            console.error("Error triggering Pusher event:", error);
           }
           return { success: true };
         }
