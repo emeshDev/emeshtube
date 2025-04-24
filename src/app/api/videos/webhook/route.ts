@@ -358,7 +358,7 @@ export const POST = async (request: Request) => {
           .where(eq(videos.muxUploadId, data.upload_id))
           .limit(1);
 
-        // Delete thumbnail from uploadthing too
+        // Delete thumbnail from uploadthing
         if (
           videoToDelete.length > 0 &&
           videoToDelete[0].thumbnailUrl &&
@@ -378,7 +378,7 @@ export const POST = async (request: Request) => {
 
         if (videoId) {
           try {
-            // Hapus entri watch history terkait video ini
+            // Delete watch history entries
             console.log(`Deleting watch history entries for video: ${videoId}`);
             await db
               .delete(watchHistory)
@@ -388,10 +388,13 @@ export const POST = async (request: Request) => {
           }
         }
 
+        // Delete video from database
         await db.delete(videos).where(eq(videos.muxUploadId, data.upload_id));
 
+        // If we have a video ID, call the video-deleted webhook to handle Pusher and cache invalidation
         if (videoId) {
           try {
+            // 1. First trigger the Pusher event for immediate UI updates
             const pusher = new Pusher({
               appId: process.env.PUSHER_APP_ID!,
               key: process.env.PUSHER_KEY!,
@@ -403,8 +406,38 @@ export const POST = async (request: Request) => {
             await pusher.trigger("videos-channel", "video-deleted", {
               videoId,
             });
+            console.log(`Pusher event triggered for deleted video: ${videoId}`);
+
+            // 2. Then trigger cache invalidation via QStash (can happen after Pusher)
+            const { Client } = await import("@upstash/qstash");
+            const qstashClient = new Client({
+              token: process.env.QSTASH_TOKEN || "",
+            });
+
+            // You can either call video-deleted webhook
+            const videoDeletedWebhook = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/video-deleted`;
+            await qstashClient.publishJSON({
+              url: videoDeletedWebhook,
+              body: {
+                videoId,
+                source: "mux_webhook",
+              },
+            });
+            console.log(
+              `Video deletion webhook triggered for video: ${videoId}`
+            );
+
+            // Or directly call invalidate-trending if that's your preference
+            // const invalidateWebhook = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/invalidate-trending`;
+            // await qstashClient.publishJSON({
+            //   url: invalidateWebhook,
+            //   body: {
+            //     timeRange: "all-ranges",
+            //     reason: `mux_video_deleted:${videoId}`,
+            //   },
+            // });
           } catch (error) {
-            console.error("Error triggering Pusher event:", error);
+            console.error("Error during post-deletion notifications:", error);
           }
         }
 

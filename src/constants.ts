@@ -19,3 +19,4 @@ export const CHANNEL_VIDEOS_LIMIT = 12;
 export const SEARCH_VIDEOS_LIMIT = 16;
 export const HISTORY_VIDEOS_LIMIT = 16;
 export const LIKED_VIDEOS_LIMIT = 20;
+export const TRENDING_VIDEOS_LIMIT = 20;

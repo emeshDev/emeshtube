@@ -494,6 +494,7 @@ export const videosRouter = createTRPCRouter({
             });
           }
 
+          // Focus solely on Pusher first
           try {
             const pusher = new Pusher({
               appId: process.env.PUSHER_APP_ID!,
@@ -503,12 +504,37 @@ export const videosRouter = createTRPCRouter({
               useTLS: true,
             });
 
+            // Explicitly await this
             await pusher.trigger("videos-channel", "video-deleted", {
               videoId: id,
             });
+            console.log(`Pusher event triggered for deleted video: ${id}`);
           } catch (error) {
             console.error("Error triggering Pusher event:", error);
           }
+
+          // Only after Pusher is confirmed, handle cache invalidation
+          try {
+            const { Client } = await import("@upstash/qstash");
+            const qstashClient = new Client({
+              token: process.env.QSTASH_TOKEN || "",
+            });
+
+            const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/invalidate-trending`;
+            await qstashClient.publishJSON({
+              url: webhookUrl,
+              body: {
+                timeRange: "all-ranges",
+                reason: `video_deleted:${id}`,
+              },
+            });
+            console.log(
+              `Trending cache invalidation triggered for deleted video: ${id}`
+            );
+          } catch (error) {
+            console.error("Error queueing trending cache invalidation:", error);
+          }
+
           return { success: true };
         }
       } catch (error) {

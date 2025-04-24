@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import { LIKED_VIDEOS_LIMIT } from "@/constants";
+import { usePusher } from "@/hooks/usePusher";
 
 interface LikedVideosViewProps {
   limit?: number;
@@ -37,12 +38,15 @@ export const LikedVideosView = ({
 }: LikedVideosViewProps) => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
+  const { deletedVideoIds } = usePusher();
+
   const {
     data: likedVideosData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isFetching,
   } = trpc.likes.getLikedVideos.useInfiniteQuery(
     {
       limit,
@@ -66,13 +70,18 @@ export const LikedVideosView = ({
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [isInitialLoading, isLoading]);
+  }, [isInitialLoading, isLoading, isFetching]);
 
   // Flatkan data untuk rendering
   const videos =
     likedVideosData?.pages
       .flatMap((page) => page.items)
-      .filter((item) => item.video !== null && item.creator !== null)
+      .filter(
+        (item) =>
+          item.video !== null &&
+          item.creator !== null &&
+          !deletedVideoIds.has(item.video.id)
+      )
       .map((item) => ({
         video: item.video!,
         creator: item.creator!,
